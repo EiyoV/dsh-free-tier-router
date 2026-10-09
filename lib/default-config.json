@@ -273,11 +273,12 @@
         "x-title": "llm-router"
       },
       "limits": {
-        "note": "实测469个模型里仅19个是零价；同时具备 vision+tools 的只有7个且全是长尾厂商。RPD 数值官方未给，别按固定值做容量规划",
+        "note": "⚠️ 2026-10-10 实测：本机 8 次请求 0 次成功。它的免费模型带 **App 门控** —— API 调用返回 403「is only available on agentic harnesses」（只在 OpenRouter 自家 App 里能用），不是额度问题。故默认标记 manualOnly，不参与 auto 路由。想用需要自己在 OpenRouter 充值并换成非门控模型。",
         "balance": true,
         "softRatio": 0.9,
         "hardRatio": 1
-      }
+      },
+      "manualOnly": true
     }
   ]
 }
