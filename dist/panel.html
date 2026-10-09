@@ -100,6 +100,7 @@
     <button id="btn-probe" class="primary">探测并优化优先级</button>
     <button id="btn-reload">重新加载配置</button>
     <button id="btn-clear">解除全部冷却</button>
+    <button id="btn-reset-usage" title="只清零本地用量计数，平台侧真实剩余不会变">重置额度用量</button>
     <button id="btn-refresh">刷新</button>
   </div>
   <div class="bar advanced">
@@ -116,11 +117,13 @@
       <thead>
         <tr>
           <th>渠道</th><th>状态</th><th>能力</th><th>默认模型</th>
-          <th title="越小越先用">优先级</th><th title="成功 / 失败">调用</th><th>token</th><th>最近错误</th>
+          <th title="越小越先用">优先级</th><th title="成功 / 失败">调用</th><th>token</th>
+          <th title="本窗口用量 / 额度上限。达到硬阈值会自动停用该渠道（防超额、防欠费）">额度</th>
+          <th>最近错误</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="8" class="meta">加载中…</td></tr>
+        <tr><td colspan="9" class="meta">加载中…</td></tr>
       </tbody>
     </table>
   </div>
@@ -142,7 +145,7 @@
   }
 
   function setBusy(busy) {
-    ['btn-clear', 'btn-probe', 'btn-probe-vision', 'btn-discover', 'btn-apply', 'btn-reload', 'btn-refresh']
+    ['btn-clear', 'btn-reset-usage', 'btn-probe', 'btn-probe-vision', 'btn-discover', 'btn-apply', 'btn-reload', 'btn-refresh']
       .forEach(function (id) { $(id).disabled = busy; });
   }
 
@@ -182,6 +185,46 @@
       fmtTime(until) + ' 恢复</span>';
   }
 
+  /**
+   * 额度单元格。
+   * 必须把"没设额度"和"额度还有富余"区分开 —— 前者根本没有护栏，不该看起来像有。
+   */
+  function quotaText(p) {
+    var b = p.budget;
+    var used = p.usageTokens || 0;
+    if (!b) {
+      return used > 0
+        ? '<span class="meta">' + used.toLocaleString() + ' token</span><div class="meta">未设额度 · 不熔断</div>'
+        : '<span class="meta">未设额度</span>';
+    }
+    var isCost = String(b.source || '').indexOf('费用') >= 0;
+
+    // perModel：额度是每个模型各一份（如火山方舟），显示"还有几个模型能顶"
+    if (b.perModel) {
+      var pcls = b.state === 'hard' ? 'err' : b.state === 'soft' ? 'cool' : 'ok';
+      var bad = (b.models || []).slice(0, 4).map(function (m) {
+        return esc(m.id) + '（' + (m.state === 'hard' ? '用完' : '降级') + '）';
+      }).join('、');
+      return '<span class="pill ' + pcls + '" title="每个模型各自记额度；用完的模型会被跳过，自动用还有额度的另一个">'
+        + b.usableModels + ' / ' + b.totalModels + '</span>'
+        + '<div class="meta">模型可用</div>'
+        + (bad ? '<div class="meta warn">' + bad + '</div>' : '');
+    }
+    var fmt = function (n) {
+      return isCost ? '¥' + (Math.round((n || 0) * 100) / 100) : Math.round(n || 0).toLocaleString();
+    };
+    var pct = b.ratio == null ? '?' : Math.round(b.ratio * 100) + '%';
+    var cls = b.state === 'hard' ? 'err' : b.state === 'soft' ? 'cool' : 'ok';
+    var tip = '判定来源：' + esc(b.source || '无数据') +
+      '；软阈值 ' + Math.round((b.softRatio || 0) * 100) + '%（只降级）' +
+      '；硬阈值 ' + Math.round((b.hardRatio || 0) * 100) + '%（停用）' +
+      (b.paid ? '；按付费渠道处理' : '');
+    var amount = b.limit != null ? fmt(b.used) + ' / ' + fmt(b.limit) : fmt(used) + ' token';
+    return '<span class="pill ' + cls + '" title="' + tip + '">' + pct + '</span>'
+      + '<div class="meta">' + amount + '</div>'
+      + (b.state !== 'ok' ? '<div class="meta warn">' + esc(String(b.reason || '').slice(0, 42)) + '</div>' : '');
+  }
+
   function renderStatus(j) {
     var rows = (j.providers || []).map(function (p) {
       var st = statusOf(p);
@@ -200,12 +243,13 @@
         + '<td>' + esc(p.priority) + '</td>'
         + '<td title="成功 / 失败">' + calls + '</td>'
         + '<td>' + (p.tokens || 0) + '</td>'
+        + '<td>' + quotaText(p) + '</td>'
         + '<td class="meta warn">' + esc(String(p.lastError || '').slice(0, 60)) + '</td>'
         + '</tr>';
     });
     $('tbody').innerHTML = rows.length
       ? rows.join('')
-      : '<tr><td colspan="8" class="meta">没有已启用的渠道 —— 先把 key 填进 .env</td></tr>';
+      : '<tr><td colspan="9" class="meta">没有已启用的渠道 —— 先把 key 填进 .env</td></tr>';
   }
 
   /** 顶部摘要：一眼看清有几个能用、烧了多少、下一个什么时候恢复。 */
@@ -231,6 +275,10 @@
     var html = stat('可用渠道', usable + ' / ' + ps.length, usable > 0 ? 'ok' : 'err');
     if (cooling > 0) html += stat('冷却中', cooling, 'warn');
     if (untested > 0) html += stat('未测试', untested);
+    var exhausted = ps.filter(function (p) { return p.budget && p.budget.state === 'hard'; }).length;
+    var degraded = ps.filter(function (p) { return p.budget && p.budget.state === 'soft'; }).length;
+    if (exhausted > 0) html += stat('额度用尽', exhausted, 'err');
+    if (degraded > 0) html += stat('额度降级', degraded, 'warn');
     html += stat('累计 token', tokens.toLocaleString());
     html += stat('累计调用', calls.toLocaleString());
     if (next) html += stat('下一个恢复', fmtTime(next), 'warn');
@@ -381,6 +429,10 @@
 
   $('btn-refresh').addEventListener('click', function () { loadStatus(); loadCatalog(); });
   $('btn-clear').addEventListener('click', function () { runAction('clear-all'); });
+  $('btn-reset-usage').addEventListener('click', function () {
+    if (!window.confirm('把所有渠道的「本地用量计数」清零？\n\n只在平台侧额度确实重置过时才这么做 —— 它会解除额度熔断。')) return;
+    runAction('budget-reset');
+  });
   $('btn-probe').addEventListener('click', function () { runAction('probe'); });
   $('btn-probe-vision').addEventListener('click', function () { runAction('probe', '&vision=1'); });
   $('btn-discover').addEventListener('click', function () { runAction('discover'); });

@@ -28,6 +28,7 @@
 | `connectTimeoutMs` | 20000 | 流式请求等首字节的超时 |
 | `requestTimeoutMs` | 180000 | 非流式请求的整体超时 |
 | `onAllCooling` | `force-any` | 全部渠道都在冷却时：`force-any` 挑冷却最短的硬试 / `force-local` 只用本地模型 / `fail` 直接报错 |
+| `perModelCandidates` | 2 | 多模型渠道（`limits.perModel`）一次请求最多产出几个候选：模型 A 当场被限流时，同一次请求里就能换成 B |
 | `cooldown.rateLimitMs` | 60000 | 429 的初始退避 |
 | `cooldown.serverErrorMs` | 20000 | 5xx / 网络 / 空流的初始退避 |
 | `cooldown.authErrorMs` | 1800000 | 401 / 402 / 403 的初始退避（30 分钟） |
@@ -53,6 +54,89 @@
 | `local` | | `true` 表示本地模型（不需要 key），如 Ollama |
 | `headers` | | 额外请求头（例如 OpenRouter 的 `x-title`） |
 | `bodyPatch` | | 请求体补丁，会合并进发往上游的 JSON |
+| `limits` | | 额度说明与**额度熔断**配置，见下节 |
+
+### limits：额度熔断（在额度用完之前就切走）
+
+`limits` 里只要出现 `tokens` / `cost` / `expiresAt` / `balance` 之一，这个渠道就启用**事前熔断**。
+**只有 `note` 的老配置行为完全不变** —— 不参与阈值判定、不干预调度。
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `note` | | 纯文字说明，不参与判定 |
+| `tokens` | | 本周期 token 上限（自己填；只统计经过本代理的流量） |
+| `cost` | | 或金额上限，配合 `priceIn` / `priceOut`（元/百万 token）折算 |
+| `priceIn` / `priceOut` | 0 | 每百万 token 的单价，用于把用量折算成钱 |
+| `window` | 不重置 | 周期：`day` / `week` / `month` / `90d` / `total` |
+| `expiresAt` | | 绝对到期时间（ISO 8601）。到点直接停用，比 `window` 准 |
+| `softRatio` | 0.9 | **软阈值**：达到后只把该渠道排到候选队尾 —— 额度不浪费，只是不再优先烧 |
+| `hardRatio` | 1.0 | **硬阈值**：达到后彻底停用，连"全部冷却时兜底"也不会选中它 |
+| `balance` | false | `true` = 只信平台自报的真实剩余（如 OpenRouter 的 `/api/v1/key`），不需要你填数字 |
+| `paid` | false | 标记为付费渠道，面板上区分显示 |
+| `perModel` | false | `true` = 这份额度是**每个模型各自一份**（同一渠道下多模型各记各的账，谁先烧完就换下一个） |
+
+判定用的是**三层信息源**（从准到糙），没有就不判定：
+
+1. **平台自报** —— 上游响应头 `x-ratelimit-remaining-tokens`（Groq / Cerebras 这类会带），
+   或 `balance: true` 时定时查到的官方余额。**平台没给数字就绝不猜。**
+2. **本地累计** —— `tokens`（或 `cost`）当分母 ÷ 本代理记录的用量。
+3. 都没有 → 不干预，回到"撞到 429 才切换"的老行为。
+
+⚠️ **必须知道的几点**
+
+- **本地累计只算经过本代理的流量**。DSH 主对话若直连上游，那部分用量这里看不到。
+- **用量写在 `~/.dsh/llm-router/usage.json`，跨重启保留**（否则重启一次就等于额度回满）。
+- 平台侧真的重置过额度时，点面板的「重置额度用量」，或 `GET /admin/budget-reset?id=<渠道>`。
+- **免费额度用完是报错（429），不是欠费** —— 所以免费渠道用软阈值就够，`hardRatio` 保持 `1.0`。
+- **按量付费渠道**（余额扣穿会产生欠费）才需要 `hardRatio: 0.8` 这类提前量；同时务必留意
+  `manualOnly` —— 它是让付费渠道彻底不被自动 fallback 撞上的第一道闸。
+
+```json
+"limits": {
+  "note": "官方标称每模型 100 万 token / 90 天",
+  "tokens": 1000000,
+  "window": "90d",
+  "softRatio": 0.9,
+  "hardRatio": 1.0
+}
+```
+
+#### 一个渠道下多个模型各自有额度（火山方舟那类）
+
+火山方舟一把 key 下能挂几十上百个模型，**每个模型各有自己的额度**。
+打开 `perModel`，账就按「渠道::模型」分开记，谁先烧完就自动换下一个：
+
+```json
+{
+  "id": "ark-free",
+  "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+  "apiKeyEnv": "ARK_API_KEY",
+  "priority": 5,
+  "capabilities": ["text"],
+  "defaultModel": "doubao-seed-1-6-flash-250715",
+  "models": ["doubao-seed-1-6-flash-250715", "kimi-k2-250711", "deepseek-v3-250324"],
+  "limits": {
+    "note": "方舟每个模型每天 200 万 token",
+    "perModel": true,
+    "tokens": 2000000,
+    "window": "day",
+    "softRatio": 0.9,
+    "hardRatio": 0.95
+  }
+}
+```
+
+行为：
+
+- 选模型时**跳过**已经烧完（硬阈值）或正在冷却的模型，自动用 `models` 里的下一个；
+- **同一次请求内就会连续尝试**（数量由 `policy.perModelCandidates` 控制，默认 2），
+  所以"模型 A 当场被限流"不必等下一次请求；
+- **429 / 404 只冷掉那一个模型**，同一渠道的别的模型照用；
+  其余失败（5xx / 网络 / 401 / 403）仍然冷却整个渠道；
+- 面板的「额度」列显示 `可用模型数 / 总模型数`。
+
+> 模型清单别手抄：`/api/v3/models` 会返回一大堆**不能对话**的模型
+> （embedding、视频生成、图片编辑…）。真打一发 `max_tokens=1` 的请求才算数。
 
 ### 示例：一个渠道配多个账号
 

@@ -66,6 +66,8 @@ console.log('\n静态检查：');
 checkContains('面板有摘要容器', html, 'id="summary"', true);
 checkContains('面板有恢复时间格式化', html, 'function fmtTime', true);
 checkContains('面板有冷却文字逻辑', html, 'function coolingText', true);
+checkContains('面板有额度单元格', html, 'function quotaText', true);
+checkContains('面板有重置用量按钮', html, 'id="btn-reset-usage"', true);
 checkContains('已移除旧的「账号管理」区', html, 'id="accounts"', false);
 checkContains('已移除旧的按钮 id', html, 'btn-acct-add', false);
 

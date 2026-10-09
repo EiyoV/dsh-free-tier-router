@@ -27,6 +27,7 @@ import {
 } from '../lib/paths.mjs';
 import { loadConfig, isConfigured } from '../lib/config.mjs';
 import { HealthRegistry } from '../lib/health.mjs';
+import { BudgetTracker } from '../lib/budget.mjs';
 import { startProxy } from '../lib/server.mjs';
 import { fetchBalance, clearBalanceCache } from '../lib/balance.mjs';
 
@@ -129,6 +130,7 @@ export async function apply(ctx, config = {}) {
   const state = {
     proxy: null,
     health: null,
+    budget: null,
     providers: [],
     config: null,
     port: null,
@@ -199,18 +201,26 @@ export async function apply(ctx, config = {}) {
 
     try {
       const health = new HealthRegistry(cfg.policy.cooldown);
+      const budget = new BudgetTracker({ log: (...a) => log('用量', ...a) });
       const proxy = await startProxy({
         config: cfg,
         providers: state.providers,
         health,
+        budget,
         log: (...a) => log('proxy', ...a),
         port,
       });
       state.proxy = proxy;
       state.health = health;
+      state.budget = budget;
       state.port = proxy.port;
       state.mode = 'own';
-      log(`内嵌代理已启动：http://127.0.0.1:${proxy.port}（${state.providers.length} 个渠道）`);
+      const guarded = state.providers.filter((p) => p.budget);
+      log(
+        `内嵌代理已启动：http://127.0.0.1:${proxy.port}（${state.providers.length} 个渠道` +
+          (guarded.length > 0 ? `，其中 ${guarded.length} 个启用额度熔断` : '，无额度熔断') +
+          '）'
+      );
     } catch (err) {
       state.mode = 'down';
       state.error = `启动代理失败：${err?.message ?? err}`;
@@ -521,9 +531,27 @@ export async function apply(ctx, config = {}) {
           return sendJson(res, 200, r);
         }
 
+        if (action === 'budget-reset') {
+          if (state.mode === 'down' || !state.port) {
+            return sendJson(res, 200, { ok: false, output: state.error ?? '代理没起来' });
+          }
+          const id = url.searchParams.get('id');
+          const r = await fetch(
+            `http://127.0.0.1:${state.port}/admin/budget-reset${id ? `?id=${encodeURIComponent(id)}` : ''}`,
+            { signal: AbortSignal.timeout(6000) }
+          );
+          const j = await r.json().catch(() => ({}));
+          return sendJson(res, 200, {
+            ok: r.ok && j.ok !== false,
+            output: id
+              ? `已把 ${id} 的额度用量计数清零（平台侧真实剩余不会变，只在确实重置过时才用）`
+              : '已把所有渠道的额度用量计数清零',
+          });
+        }
+
         return sendJson(res, 400, {
           error: `未知动作 "${action}"`,
-          allowed: ['clear-all', 'reload', 'probe', 'discover', 'discover-apply'],
+          allowed: ['clear-all', 'budget-reset', 'reload', 'probe', 'discover', 'discover-apply'],
         });
       } catch (err) {
         sendJson(res, 500, { error: String(err?.message ?? err) });
@@ -585,9 +613,30 @@ export async function apply(ctx, config = {}) {
     },
   });
 
+  // ── 额度熔断：能查真实余额的渠道定时补货 ──────────────────────────
+  // OpenRouter 这类平台有官方余额接口（balance.mjs）。查到的剩余额度直接灌进预算账本，
+  // 于是它**不用用户填任何数字**就有护栏。查不到的平台该函数返回 null，什么都不做。
+  const BALANCE_INTERVAL_MS = 5 * 60 * 1000;
+  const refreshBalances = async () => {
+    if (state.mode !== 'own' || !state.budget) return;
+    for (const p of state.providers) {
+      if (!p.budget?.useBalance) continue;
+      try {
+        const b = await fetchBalance(p);
+        if (b) state.budget.reportRemaining(p.id, { remaining: b.remaining, limit: b.limit });
+      } catch {
+        /* 查不到就算了：assess 会退回本地累计，实在没有数字就不干预 */
+      }
+    }
+  };
+  const balanceTimer = setInterval(refreshBalances, BALANCE_INTERVAL_MS);
+  balanceTimer.unref?.();
+  if (state.mode === 'own') refreshBalances().catch(() => {});
+
   // 插件卸载时收掉自己起的代理
   ctx.effect(() => () => {
     state.proxy?.close().catch(() => {});
+    clearInterval(balanceTimer);
   }, `${name}: proxy lifecycle`);
 
   log(
