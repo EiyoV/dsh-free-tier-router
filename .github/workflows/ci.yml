@@ -1,0 +1,47 @@
+name: CI
+
+# 这个项目没有构建步骤，所以 CI 就是「把自检全跑一遍」。
+#
+# 注意：verify-package.mjs 依赖 PowerShell 的 Compress-Archive，只在 Windows 上跑，
+# 这里故意跳过 —— 它在本地发布流程里跑（PUBLISHING.md 有清单）。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  self-check:
+    name: 自检（Node ${{ matrix.node }}）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # 放第一个：往公开仓库里推真实密钥是不可逆的事故，这条最不能出错
+      - name: 密钥泄露扫描
+        run: node test/check-secrets.mjs
+
+      - name: 面板语法与静态检查
+        run: node test/check-panel.mjs
+
+      - name: 恢复时间解析
+        run: node test/reset-at.mjs
+
+      - name: 内核冒烟测试（验证自包含启动）
+        run: node test/smoke.mjs
+
+      - name: 探测结果回报通道
+        run: node test/probe-report.mjs
+
+      - name: 核心自检（fallback / 能力路由 / 熔断）
+        run: node test/run-tests.mjs
