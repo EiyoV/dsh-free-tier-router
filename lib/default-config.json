@@ -27,10 +27,10 @@
         "text",
         "tools"
       ],
-      "defaultModel": "glm-4-flash",
+      "defaultModel": "glm-4.7-flash",
       "models": [
-        "glm-4-flash",
-        "glm-4.7-flash"
+        "glm-4.7-flash",
+        "glm-4-flash"
       ],
       "limits": {
         "note": "官方模型总览页标为免费；RPM/TPM 未核实。模型 id 会变，务必用 npm run probe 核实"
@@ -76,7 +76,7 @@
         "tokens": 1000000,
         "window": "90d",
         "softRatio": 0.9,
-        "hardRatio": 1.0
+        "hardRatio": 1
       }
     },
     {
@@ -277,7 +277,7 @@
         "note": "实测469个模型里仅19个是零价；同时具备 vision+tools 的只有7个且全是长尾厂商。RPD 数值官方未给，别按固定值做容量规划",
         "balance": true,
         "softRatio": 0.9,
-        "hardRatio": 1.0
+        "hardRatio": 1
       }
     }
   ]
