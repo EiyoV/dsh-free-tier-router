@@ -65,7 +65,17 @@ node add-account.mjs --list                    # 看每个渠道有几把
 > ⚠️ **同一个账号建多把 key 是共享额度的** —— 多把 key 只在「不同账号」时才有独立额度。
 > 多账号轮换免费额度普遍违反平台条款，有封号风险，后果自负。
 
-## 换台电脑怎么用
+## 安装
+
+### 方式一：从 GitHub 装（推荐）
+
+```powershell
+dsh plugin --profile <你的profile名> add github:EiyoV/dsh-free-tier-router
+```
+
+装完**重启 DSH**，然后在「设置 → 渠道池」打开面板，或直接访问 http://127.0.0.1:19387/llm-router
+
+### 方式二：用 zip 包离线装
 
 1. 拿到 `dsh-free-tier-router-1.0.0.zip`（在项目 `dist-package/` 下，或自己跑 `node dsh-plugin/pack.mjs` 生成）
 2. 解压到任意目录

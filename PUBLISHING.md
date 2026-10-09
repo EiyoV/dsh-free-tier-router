@@ -31,22 +31,37 @@ dsh plugin --profile <profile名> add dsh-free-tier-router
 （比如加自己的前缀 `你的名字-dsh-free-tier-router`），然后同步改 `cordis.patch.yml`
 里 `insert` 的 `name` 字段 —— **两处必须一致**，否则挂载不上。
 
-## 方式 B：发到 GitHub（不需要 npm 账号）
+## 方式 B：发到 GitHub（已发布 ✅）
 
-```powershell
-# 1) 把 dsh-plugin/ 目录推到一个公开仓库
-git init
-git add .
-git commit -m "dsh-free-tier-router v1.0.0"
-git remote add origin https://github.com/你的用户名/dsh-free-tier-router.git
-git push -u origin main
-```
+**仓库：https://github.com/EiyoV/dsh-free-tier-router**
 
 别人这样装：
 
 ```powershell
-dsh plugin --profile <profile名> add github:你的用户名/dsh-free-tier-router
+dsh plugin --profile <profile名> add github:EiyoV/dsh-free-tier-router
 ```
+
+### 首次发布的步骤（留档，换仓库时照做）
+
+```powershell
+cd dsh-plugin
+git init -b main
+git config user.name "你的名字"
+git config user.email "你的邮箱"        # 用 GitHub 绑定的邮箱，提交才会算在你名下
+git add -A
+git commit -F <提交信息文件>
+git remote add origin https://github.com/<用户名>/dsh-free-tier-router.git
+git push -u origin main
+```
+
+**两个踩过的坑**：
+
+1. **`.gitattributes` 里必须有 `* -text`** —— 否则在 `core.autocrlf=true` 的机器上，
+   每次 checkout 都会把 LF 换成 CRLF，产生"整个文件都改了"的假 diff。
+2. **推送前确认 GitHub 上的仓库是空的** —— 建仓库时 README / .gitignore / license
+   **三个都不要勾**，否则远端已有 commit，push 会因"历史不相关"被拒。
+3. 如果推送报 `Invalid username or token`：是凭据管理器里存了失效的 PAT。
+   删掉重来：`cmd /c "cmdkey /delete:https://github.com/"`，再 push 会重新弹认证。
 
 ## 发布前自检
 
@@ -57,6 +72,7 @@ node dsh-plugin\test\smoke.mjs             # 11 项：内核自包含启动
 node dsh-plugin\test\probe-report.mjs      # 12 项：探测结果回报通道
 node dsh-plugin\test\reset-at.mjs          # 10 项：恢复时间解析
 node dsh-plugin\test\check-panel.mjs       #  7 项：面板语法 + 静态检查
+node dsh-plugin\test\check-secrets.mjs     #  1 项：密钥泄露扫描（发布安全门，别跳过）
 node dsh-plugin\test\catalog-link.mjs      # 平台↔渠道关联
 node test\verify-package.mjs               # 19 项：解压到临时目录验证自包含
 ```
