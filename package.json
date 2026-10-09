@@ -1,0 +1,51 @@
+{
+  "name": "dsh-llm-router-panel",
+  "version": "1.0.0",
+  "description": "多平台免费 LLM 渠道池：自动 fallback、按任务挑渠道（识图/工具）、按实测 token 成本自动排序优先级",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "llm",
+    "fallback",
+    "free-tier",
+    "router",
+    "openai-compatible"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "lib",
+    "cordis.patch.yml",
+    "install.mjs",
+    "install.ps1",
+    "test",
+    "README.md",
+    "PUBLISHING.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  }
+}

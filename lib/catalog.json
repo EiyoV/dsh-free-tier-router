@@ -1,0 +1,130 @@
+{
+  "updated": "2026-10-09",
+  "note": "人工维护的已知免费渠道目录。discover 命令用它 + 实时数据，告诉你「还缺哪个渠道、去哪注册、要准备什么」。自动发现的能力边界：有公开 JSON API 的渠道（如 OpenRouter）可以全自动；文档站是 SPA 的国内渠道（智谱/火山/硅基）抓不到正文，只能靠这里人工维护。没有任何程序能替你注册账号。",
+  "channels": [
+    {
+      "id": "zhipu",
+      "label": "智谱 GLM",
+      "priorityHint": 10,
+      "registerUrl": "https://open.bigmodel.cn/",
+      "materials": "国内手机号即可，无需绑卡、无需实名升级",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "verified": "已核实存在免费模型（2026-10 抓取官方模型总览页）",
+      "knownModels": ["glm-4.7-flash", "glm-4.6v-flash", "glm-4v-flash"],
+      "capabilitiesHint": "有免费视觉模型（GLM-4.6V-Flash / GLM-4V-Flash）—— 手机自动化首选",
+      "confidence": "high"
+    },
+    {
+      "id": "dashscope",
+      "label": "阿里云百炼",
+      "priorityHint": 20,
+      "registerUrl": "https://bailian.console.aliyun.com/",
+      "materials": "阿里云账号 + 国内实名认证",
+      "apiKeyEnv": "DASHSCOPE_API_KEY",
+      "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "verified": "已核实额度规则（每模型约 100 万 token / 90 天）",
+      "knownModels": ["qwen-plus", "qwen-turbo", "qwen-vl-plus"],
+      "capabilitiesHint": "模型选择多；额度独立、用完不自动切换，正好由代理层兜",
+      "caveats": [
+        "90 天到期，不补发、不延期、不重置",
+        "仅华北2（北京）地域有免费额度",
+        "同一实名主体重新注册不能重领",
+        "有效期内不使用也照走计时"
+      ],
+      "confidence": "high"
+    },
+    {
+      "id": "siliconflow",
+      "label": "硅基流动 SiliconFlow",
+      "priorityHint": 30,
+      "registerUrl": "https://cloud.siliconflow.cn/",
+      "materials": "国内手机号注册",
+      "apiKeyEnv": "SILICONFLOW_API_KEY",
+      "baseURL": "https://api.siliconflow.cn/v1",
+      "verified": "未能核实 —— 官方文档站是 SPA，抓不到额度正文；但页面有「免费」模型标记",
+      "knownModels": ["Qwen/Qwen3-8B", "Qwen/Qwen2.5-7B-Instruct"],
+      "capabilitiesHint": "国内直连；免费模型清单与 vision/tools 能力待你注册后用 probe 核实",
+      "confidence": "low"
+    },
+    {
+      "id": "volcano",
+      "label": "火山方舟（你已有 key）",
+      "priorityHint": 100,
+      "registerUrl": "https://console.volcengine.com/ark",
+      "materials": "已配置",
+      "apiKeyEnv": "ARK_API_KEY",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "verified": "本机实测可用（工具调用 + 图片输入均通过）",
+      "knownModels": ["deepseek-v4-1-flash-260910"],
+      "capabilitiesHint": "付费订阅，当兜底用。注意 /api/coding/v3 与 /api/v3 是两条不同通道",
+      "confidence": "high"
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter 免费池",
+      "priorityHint": 230,
+      "registerUrl": "https://openrouter.ai/",
+      "materials": "邮箱注册即可（不充值不需要卡）；但访问需要海外网络",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "baseURL": "https://openrouter.ai/api/v1",
+      "verified": "已核实：469 个模型中仅 19 个零价；vision+tools 仅 7 个且全是长尾厂商",
+      "discovery": "openrouter-models",
+      "capabilitiesHint": "唯一能全自动发现新免费模型的渠道 —— 用 discover --openrouter 实时拉取",
+      "caveats": ["需海外网络（本机可访问，但延迟高）", "RPD 数值官方未给，别按固定值规划容量", "免费模型可能随时下架"],
+      "confidence": "medium"
+    },
+    {
+      "id": "github-models",
+      "label": "GitHub Models（已下线，勿入池）",
+      "registerUrl": "https://docs.github.com/en/github-models/about-github-models",
+      "materials": "—",
+      "apiKeyEnv": null,
+      "baseURL": null,
+      "verified": "已核实：2026-07-30 起 playground / 模型目录 / 推理 API / BYOK 全部停止",
+      "deprecated": true,
+      "confidence": "high"
+    },
+    {
+      "id": "cerebras",
+      "label": "Cerebras（无永久免费层，勿当免费池）",
+      "registerUrl": "https://cloud.cerebras.ai/",
+      "materials": "必须绑已验证的支付方式",
+      "apiKeyEnv": "CEREBRAS_API_KEY",
+      "baseURL": "https://api.cerebras.ai/v1",
+      "verified": "已核实：官方明文无永久免费层；$5 试用额度 30 天过期",
+      "deprecated": true,
+      "confidence": "high"
+    },
+    {
+      "id": "baidu-qianfan",
+      "label": "百度千帆（一次性代金券）",
+      "registerUrl": "https://cloud.baidu.com/doc/qianfan/index.html",
+      "materials": "百度账号 + 实名认证",
+      "apiKeyEnv": "QIANFAN_API_KEY",
+      "baseURL": "https://qianfan.baidubce.com/v2",
+      "verified": "已核实：实名后送 20 元代金券，有效期一个月，非长期免费",
+      "confidence": "medium"
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini 免费层",
+      "registerUrl": "https://aistudio.google.com/apikey",
+      "materials": "Google 账号；本机网络实测不可达",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "verified": "未能核实 —— 本机 DNS 直接不解析（网络层失败，不代表没有免费额度）",
+      "confidence": "unknown"
+    },
+    {
+      "id": "groq",
+      "label": "Groq 免费层",
+      "registerUrl": "https://console.groq.com/keys",
+      "materials": "Google/GitHub 账号；本机实测 403",
+      "apiKeyEnv": "GROQ_API_KEY",
+      "baseURL": "https://api.groq.com/openai/v1",
+      "verified": "未能核实 —— 抓取返回 403",
+      "confidence": "unknown"
+    }
+  ]
+}

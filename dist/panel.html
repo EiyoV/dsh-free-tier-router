@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>llm-router 渠道池</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 24px 60px;
+    font: 13px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: var(--dsw-alias-label-primary, #1f2328);
+    background: var(--dsw-alias-bg-base, #f7f8fa);
+  }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2 { font-size: 14px; margin: 26px 0 10px; }
+  .sub { color: var(--dsw-alias-label-tertiary, #8b93a1); font-size: 12px; margin-bottom: 16px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    background: var(--dsw-alias-bg-layer-2, #fff);
+    color: var(--dsw-alias-label-primary, #1f2328);
+  }
+  button:hover:not([disabled]) { border-color: var(--dsw-alias-brand-primary, #4f6ef7); }
+  button[disabled] { opacity: .45; cursor: default; }
+  table {
+    border-collapse: collapse; width: 100%;
+    background: var(--dsw-alias-bg-layer-2, #fff);
+    border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    border-radius: 8px; overflow: hidden;
+  }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--dsw-alias-border-l2, #eef0f3); vertical-align: top; }
+  th { font-weight: 600; font-size: 12px; color: var(--dsw-alias-label-secondary, #6b7280); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; white-space: nowrap; }
+  .ok   { background: rgba(34,197,94,.14);  color: #15803d; }
+  .cool { background: rgba(245,158,11,.16); color: #b45309; }
+  .off  { background: rgba(148,163,184,.22); color: #475569; }
+  .err  { background: rgba(239,68,68,.14);  color: #b91c1c; }
+  .card {
+    background: var(--dsw-alias-bg-layer-2, #fff);
+    border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 13px; }
+  .meta { color: var(--dsw-alias-label-tertiary, #8b93a1); font-size: 12px; }
+  .meta b { color: var(--dsw-alias-label-secondary, #6b7280); font-weight: 600; }
+  .warn { color: #b45309; }
+  code {
+    background: rgba(127,127,127,.12); padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+  }
+  a { color: var(--dsw-alias-brand-primary, #4f6ef7); }
+  #msg { min-height: 20px; font-size: 12px; color: var(--dsw-alias-label-tertiary, #8b93a1); margin-bottom: 8px; }
+  .keyrow { display: flex; gap: 6px; margin-top: 8px; }
+  .keyrow input {
+    flex: 1 1 auto; min-width: 0; font: inherit; padding: 5px 8px; border-radius: 6px;
+    border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    background: var(--dsw-alias-bg-base, #fff); color: var(--dsw-alias-label-primary, #1f2328);
+  }
+  #msg.bad { color: #b91c1c; }
+  #out {
+    display: none; max-height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+    background: var(--dsw-alias-bg-layer-2, #fff); border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    border-radius: 8px; padding: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+  }
+  .scroll { overflow-x: auto; }
+
+  /* ── 顶部摘要：一眼看清现在什么状况 ── */
+  .summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat {
+    background: var(--dsw-alias-bg-layer-2, #fff);
+    border: 1px solid var(--dsw-alias-border-l2, #e5e7eb);
+    border-radius: 8px; padding: 8px 14px; min-width: 92px;
+  }
+  .stat .k { font-size: 11px; color: var(--dsw-alias-label-tertiary, #8b93a1); white-space: nowrap; }
+  .stat .v { font-size: 17px; font-weight: 600; line-height: 1.35; }
+  .stat .v.ok { color: #15803d; }
+  .stat .v.warn { color: #b45309; }
+  .stat .v.err { color: #b91c1c; }
+
+  button.primary {
+    background: var(--dsw-alias-brand-primary, #4f6ef7);
+    border-color: var(--dsw-alias-brand-primary, #4f6ef7);
+    color: #fff;
+  }
+  button.primary:hover:not([disabled]) { filter: brightness(1.1); }
+  .bar.advanced { margin-top: -4px; }
+  .bar.advanced button { font-size: 12px; padding: 4px 10px; }
+</style>
+</head>
+<body>
+  <h1>llm-router 渠道池</h1>
+  <div class="sub" id="sub">正在读取…</div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="bar">
+    <button id="btn-probe" class="primary">探测并优化优先级</button>
+    <button id="btn-reload">重新加载配置</button>
+    <button id="btn-clear">解除全部冷却</button>
+    <button id="btn-refresh">刷新</button>
+  </div>
+  <div class="bar advanced">
+    <span class="meta" style="align-self:center">高级：</span>
+    <button id="btn-probe-vision">探测（含视觉）</button>
+    <button id="btn-discover">发现新免费模型</button>
+    <button id="btn-apply">发现并写入配置</button>
+  </div>
+  <div id="msg"></div>
+
+  <h2>渠道状态</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>渠道</th><th>状态</th><th>能力</th><th>默认模型</th>
+          <th title="越小越先用">优先级</th><th title="成功 / 失败">调用</th><th>token</th><th>最近错误</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="8" class="meta">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>平台与 API Key 管理</h2>
+  <div id="pending"><div class="meta">加载中…</div></div>
+
+  <pre id="out"></pre>
+
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ESC[c]; }); }
+
+  function setMsg(text, bad) {
+    var el = $('msg');
+    el.textContent = text || '';
+    el.className = bad ? 'bad' : '';
+  }
+
+  function setBusy(busy) {
+    ['btn-clear', 'btn-probe', 'btn-probe-vision', 'btn-discover', 'btn-apply', 'btn-reload', 'btn-refresh']
+      .forEach(function (id) { $(id).disabled = busy; });
+  }
+
+  /**
+   * 状态必须看"有没有请求记录"：后端给的 available 对从未请求过的渠道也是 true，
+   * 直接拿它渲染就会显示成绿色「可用」—— 那是骗人的。
+   */
+  function statusOf(p) {
+    // 优先用后端给的：它知道有没有请求记录。旧版前端按 available 自己推断，
+    // 而 available 对"从未请求过"的渠道也是 true，会显示成绿色「可用」—— 那是骗人的。
+    if (p.status) return p.status;
+    if (!p.requests) return 'untested';
+    if (!p.available) return 'cooling';
+    if (p.ok > 0) return 'ok';
+    return 'failing';
+  }
+
+  /** 时间戳 → HH:MM:SS（不是今天则带上日期）。 */
+  function fmtTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    var sameDay = d.toDateString() === new Date().toDateString();
+    return (sameDay ? '' : (d.getMonth() + 1) + '/' + d.getDate() + ' ') +
+      pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  /**
+   * 冷却文字：**优先用上游明确给的恢复时间**（比如火山会在 429 里写 reset at ...），
+   * 没有才退回本地冷却到期时间。告诉用户"几点恢复"比"还剩 3600 秒"有用得多。
+   */
+  function coolingText(p) {
+    var until = p.resetAt || p.cooldownUntil || 0;
+    if (!until) return '冷却 ' + Math.round((p.coolingMs || 0) / 1000) + 's';
+    if (until - Date.now() <= 0) return '即将恢复';
+    return '<span title="' + (p.resetAt ? '上游给出的恢复时间' : '本地冷却到期时间') + '">' +
+      fmtTime(until) + ' 恢复</span>';
+  }
+
+  function renderStatus(j) {
+    var rows = (j.providers || []).map(function (p) {
+      var st = statusOf(p);
+      var badge = st === 'untested' ? '<span class="pill off">未测试</span>'
+        : st === 'cooling' ? '<span class="pill cool">' + coolingText(p) + '</span>'
+        : st === 'failing' ? '<span class="pill err">失败过</span>'
+        : '<span class="pill ok">可用</span>';
+
+      var calls = (p.requests || 0) === 0 ? '-' : ((p.ok || 0) + ' / ' + (p.failures || 0));
+
+      return '<tr>'
+        + '<td><code>' + esc(p.id) + '</code><div class="meta">' + esc(p.label) + '</div></td>'
+        + '<td>' + badge + '</td>'
+        + '<td class="meta">' + esc((p.capabilities || []).join('+')) + '</td>'
+        + '<td class="meta">' + esc((p.models || [])[0] || '-') + '</td>'
+        + '<td>' + esc(p.priority) + '</td>'
+        + '<td title="成功 / 失败">' + calls + '</td>'
+        + '<td>' + (p.tokens || 0) + '</td>'
+        + '<td class="meta warn">' + esc(String(p.lastError || '').slice(0, 60)) + '</td>'
+        + '</tr>';
+    });
+    $('tbody').innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="8" class="meta">没有已启用的渠道 —— 先把 key 填进 .env</td></tr>';
+  }
+
+  /** 顶部摘要：一眼看清有几个能用、烧了多少、下一个什么时候恢复。 */
+  function renderSummary(j) {
+    var ps = j.providers || [];
+    var usable = ps.filter(function (p) { return statusOf(p) === 'ok'; }).length;
+    var cooling = ps.filter(function (p) { return statusOf(p) === 'cooling'; }).length;
+    var untested = ps.filter(function (p) { return statusOf(p) === 'untested'; }).length;
+    var tokens = ps.reduce(function (a, p) { return a + (p.tokens || 0); }, 0);
+    var calls = ps.reduce(function (a, p) { return a + (p.requests || 0); }, 0);
+
+    var next = null;
+    for (var i = 0; i < ps.length; i += 1) {
+      var t = ps[i].resetAt || ps[i].cooldownUntil || 0;
+      if (t > Date.now() && (next === null || t < next)) next = t;
+    }
+
+    function stat(k, v, cls) {
+      return '<div class="stat"><div class="k">' + k + '</div><div class="v' +
+        (cls ? ' ' + cls : '') + '">' + v + '</div></div>';
+    }
+
+    var html = stat('可用渠道', usable + ' / ' + ps.length, usable > 0 ? 'ok' : 'err');
+    if (cooling > 0) html += stat('冷却中', cooling, 'warn');
+    if (untested > 0) html += stat('未测试', untested);
+    html += stat('累计 token', tokens.toLocaleString());
+    html += stat('累计调用', calls.toLocaleString());
+    if (next) html += stat('下一个恢复', fmtTime(next), 'warn');
+
+    $('summary').innerHTML = html;
+  }
+
+  /**
+   * 一个平台一张卡：平台信息 + API 管理地址 + key 槽位管理（增 / 删 / 改）。
+   * 已入池的（config.json 里有对应 provider）直接管 key；
+   * 还没入池的显示注册引导 + 填第一把 key 的入口。
+   */
+  function renderCatalog(j) {
+    var all = (j.channels || []).filter(function (c) { return !c.deprecated; });
+    var dead = (j.channels || []).filter(function (c) { return c.deprecated; });
+
+    // 已入池的排前面，其余按 priorityHint
+    all.sort(function (a, b) {
+      if (!!a.inPool !== !!b.inPool) return a.inPool ? -1 : 1;
+      return (a.priorityHint || 999) - (b.priorityHint || 999);
+    });
+
+    var html = '';
+
+    for (var i = 0; i < all.length; i += 1) {
+      var c = all[i];
+      var keys = c.keys || [];
+      var filled = keys.filter(function (k) { return k.filled; }).length;
+
+      var badge = c.inPool
+        ? (c.enabled
+            ? (c.manualOnly ? '<span class="pill cool">仅手动</span>' : '<span class="pill ok">已入池</span>')
+            : '<span class="pill off">已禁用</span>')
+        : '<span class="pill off">未配置</span>';
+
+      html += '<div class="card">'
+        + '<h3>' + esc(c.label) + ' ' + badge + '</h3>'
+        + '<div class="meta"><b>API 管理：</b><a href="' + esc(c.registerUrl) + '" target="_blank" rel="noreferrer">' + esc(c.registerUrl) + '</a></div>'
+        + '<div class="meta"><b>需要：</b>' + esc(c.materials) + '</div>'
+        + (c.capabilitiesHint ? '<div class="meta"><b>价值：</b>' + esc(c.capabilitiesHint) + '</div>' : '')
+        + '<div class="meta"><b>核实：</b>' + esc(c.verified) + '</div>'
+        + (c.providerIds && c.providerIds.length
+            ? '<div class="meta"><b>池中渠道：</b>' + esc(c.providerIds.join(', '))
+              + (c.priorities && c.priorities.length ? ' · 优先级 ' + esc(c.priorities.join(' / ')) : '')
+              + '</div>'
+            : '')
+        + (c.balances && c.balances.length
+            ? c.balances.map(function (b) {
+                var rem = b.remaining === null || b.remaining === undefined ? '?' : b.remaining;
+                var lim = b.limit === null || b.limit === undefined ? '?' : b.limit;
+                return '<div class="meta"><b>剩余额度：</b>' + esc(rem) + ' / ' + esc(lim)
+                  + '（已用 ' + esc(b.usage === null || b.usage === undefined ? 0 : b.usage) + '）'
+                  + (b.isFreeTier ? ' <span class="pill off">免费层</span>' : '')
+                  + (b.expiresAt ? ' · 到期 ' + esc(String(b.expiresAt).slice(0, 10)) : '')
+                  + ' <span class="meta">（' + esc(b.note) + '）</span>'
+                  + '</div>';
+              }).join('')
+            : '')
+        + (c.caveats || []).map(function (x) { return '<div class="meta warn">⚠️ ' + esc(x) + '</div>'; }).join('');
+
+      if (keys.length) {
+        html += '<div class="meta" style="margin-top:10px"><b>API Key（' + filled + '/' + keys.length + ' 把已填）</b></div>';
+        for (var k = 0; k < keys.length; k += 1) {
+          var key = keys[k];
+          var pid0 = (key.providerIds || [])[0] || '';
+          html += '<div class="keyrow">'
+            + '<span class="meta" style="flex:0 0 200px">'
+            + (key.filled ? '✅ ' : '⬜ ') + '<code>' + esc(key.name) + '</code>'
+            + (key.filled ? ' · ' + key.length : '')
+            + '</span>'
+            + '<input type="password" id="acct-' + esc(key.name) + '" placeholder="输入新值可替换这一把" autocomplete="off" spellcheck="false" />'
+            + '<button data-savekey="' + esc(key.name) + '" data-input="acct-' + esc(key.name) + '">替换</button>'
+            + (keys.length > 1
+                ? '<button data-delkey="' + esc(key.name) + '" data-provider="' + esc(pid0) + '">删除</button>'
+                : '')
+            + '</div>';
+        }
+        html += '<div class="keyrow" style="margin-top:10px">'
+          + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴另一个账号的 key" autocomplete="off" spellcheck="false" />'
+          + '<button data-addkey="' + esc(keys[0].addTo || (c.providerIds || [])[0] || '') + '" data-input="new-' + esc(c.id) + '">➕ 增加一把</button>'
+          + '</div>';
+      } else {
+        html += '<div class="keyrow" style="margin-top:10px">'
+          + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴 key（先去上面的地址注册）" autocomplete="off" spellcheck="false" />'
+          + '<button data-savekey="' + esc(c.apiKeyEnv || '') + '" data-input="new-' + esc(c.id) + '">保存</button>'
+          + '</div>';
+      }
+
+      html += '</div>';
+    }
+
+    if (dead.length) {
+      html += '<div class="card"><h3>🚫 不该入池</h3>'
+        + dead.map(function (c) { return '<div class="meta">' + esc(c.label) + ' — ' + esc(c.verified) + '</div>'; }).join('')
+        + '</div>';
+    }
+
+    $('pending').innerHTML = html || '<div class="meta">渠道目录是空的</div>';
+  }
+
+  async function loadStatus() {
+    try {
+      var r = await fetch('/api/llm-router/status', { cache: 'no-store' });
+      var j = await r.json();
+      if (j.error && !(j.providers || []).length) throw new Error(j.error);
+      renderStatus(j);
+      renderSummary(j);
+      $('sub').textContent = '更新于 ' + new Date().toLocaleTimeString()
+        + ' · ' + (j.ok ? '有可用渠道' : '全部不可用')
+        + (j.now ? ' · 代理时间 ' + j.now : '');
+    } catch (e) {
+      renderStatus({});
+      $('sub').textContent = '离线';
+      setMsg('读不到 llm-router：' + e.message + ' —— 确认它已启动（项目目录下 start.cmd）', true);
+    }
+  }
+
+  async function loadCatalog() {
+    try {
+      var r = await fetch('/api/llm-router/catalog', { cache: 'no-store' });
+      var j = await r.json();
+      if (j.error) throw new Error(j.error);
+      renderCatalog(j);
+    } catch (e) {
+      $('pending').innerHTML = '<div class="card warn">读不到渠道目录：' + esc(e.message) + '</div>';
+    }
+  }
+
+  async function runAction(what, extra) {
+    setBusy(true);
+    setMsg('正在执行 ' + what + ' …（探测/发现会真实调用上游，可能几十秒）');
+    try {
+      var r = await fetch('/api/llm-router/action?do=' + encodeURIComponent(what) + (extra || ''), { cache: 'no-store' });
+      var j = await r.json();
+      var text = j.output || j.result || JSON.stringify(j, null, 2);
+      var box = $('out');
+      box.textContent = text;
+      box.style.display = 'block';
+      setMsg(j.ok ? '完成：' + what : '执行有错误：' + what + '（下面有输出）', !j.ok);
+      await loadStatus();
+      await loadCatalog();
+    } catch (e) {
+      setMsg('执行失败：' + e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  $('btn-refresh').addEventListener('click', function () { loadStatus(); loadCatalog(); });
+  $('btn-clear').addEventListener('click', function () { runAction('clear-all'); });
+  $('btn-probe').addEventListener('click', function () { runAction('probe'); });
+  $('btn-probe-vision').addEventListener('click', function () { runAction('probe', '&vision=1'); });
+  $('btn-discover').addEventListener('click', function () { runAction('discover'); });
+  $('btn-apply').addEventListener('click', function () { runAction('discover-apply'); });
+  $('btn-reload').addEventListener('click', function () { runAction('reload'); });
+
+  // 面板上的 key 操作统一走这里。内容都是动态渲染的，所以委托到 document。
+  // Host 侧只接受本机回环请求。
+  document.addEventListener('click', async function (ev) {
+    // ── 保存 / 替换某一把 key ──────────────────────────────────────
+    var saveBtn = ev.target.closest('button[data-savekey]');
+    if (saveBtn) {
+      var keyName = saveBtn.getAttribute('data-savekey');
+      var input = document.getElementById(saveBtn.getAttribute('data-input'));
+      var value = input ? input.value.trim() : '';
+      if (!value) { setMsg('请先粘贴 key 的值', true); return; }
+      saveBtn.disabled = true;
+      try {
+        var r1 = await fetch('/api/llm-router/save-key', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: keyName, value: value })
+        });
+        var j1 = await r1.json();
+        if (j1.ok) {
+          input.value = '';
+          setMsg('已保存 ' + keyName + '。点「重新加载配置」让它生效。');
+          await loadCatalog();
+        } else {
+          setMsg('保存失败：' + (j1.error || '未知错误'), true);
+        }
+      } catch (e) {
+        setMsg('保存失败：' + e.message, true);
+      } finally {
+        saveBtn.disabled = false;
+      }
+      return;
+    }
+
+    // ── 删除某个账号槽位 ──────────────────────────────────────────
+    var delBtn = ev.target.closest('button[data-delkey]');
+    if (delBtn) {
+      var delName = delBtn.getAttribute('data-delkey');
+      var providerId = delBtn.getAttribute('data-provider');
+      if (!window.confirm('确定删除账号槽位 ' + delName + ' 吗？\n\n会从 config.json 移除这个槽位，并把 .env 里那一行清空。')) return;
+      delBtn.disabled = true;
+      try {
+        var r2 = await fetch('/api/llm-router/account', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'remove', providerId: providerId, name: delName })
+        });
+        var j2 = await r2.json();
+        setMsg(
+          j2.ok ? '已删除 ' + delName + '。点「重新加载配置」生效。' : '删除失败：' + (j2.error || '未知错误'),
+          !j2.ok
+        );
+        await loadCatalog();
+      } catch (e) {
+        setMsg('删除失败：' + e.message, true);
+      } finally {
+        delBtn.disabled = false;
+      }
+      return;
+    }
+
+    // ── 增加一把 key（另一个账号）────────────────────────────────
+    var addBtn = ev.target.closest('button[data-addkey]');
+    if (addBtn) {
+      var pid = addBtn.getAttribute('data-addkey');
+      var newInput = document.getElementById(addBtn.getAttribute('data-input'));
+      var newValue = newInput ? newInput.value.trim() : '';
+      if (!pid) { setMsg('这个平台还没有入池的渠道，无法增加账号', true); return; }
+      if (!newValue) { setMsg('请粘贴新账号的 key', true); return; }
+      addBtn.disabled = true;
+      try {
+        var r3 = await fetch('/api/llm-router/account', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'add', providerId: pid, value: newValue })
+        });
+        var j3 = await r3.json();
+        if (j3.ok) {
+          if (newInput) newInput.value = '';
+          setMsg('已给 ' + pid + ' 增加 ' + j3.name + '。点「重新加载配置」生效。');
+          await loadCatalog();
+        } else {
+          setMsg('增加失败：' + (j3.error || '未知错误'), true);
+        }
+      } catch (e) {
+        setMsg('增加失败：' + e.message, true);
+      } finally {
+        addBtn.disabled = false;
+      }
+      return;
+    }
+  });
+
+  loadStatus();
+  loadCatalog();
+  setInterval(loadStatus, 15000);
+</script>
+</body>
+</html>

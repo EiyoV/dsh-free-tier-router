@@ -1,0 +1,274 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8787
+  },
+  "policy": {
+    "maxAttempts": 6,
+    "connectTimeoutMs": 20000,
+    "requestTimeoutMs": 180000,
+    "onAllCooling": "force-any",
+    "cooldown": {
+      "rateLimitMs": 60000,
+      "serverErrorMs": 20000,
+      "authErrorMs": 1800000,
+      "minMs": 5000,
+      "maxMs": 3600000
+    }
+  },
+  "providers": [
+    {
+      "id": "zhipu-text",
+      "label": "智谱 GLM 免费文本模型（国内直连）",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "priority": 20,
+      "capabilities": [
+        "text"
+      ],
+      "defaultModel": "glm-4.7-flash",
+      "models": [
+        "glm-4.7-flash",
+        "glm-4-flash"
+      ],
+      "limits": {
+        "note": "官方模型总览页标为免费；RPM/TPM 未核实。模型 id 会变，务必用 npm run probe 核实"
+      }
+    },
+    {
+      "id": "zhipu-vision",
+      "label": "智谱 GLM 免费视觉模型（国内直连·手机自动化主力候选）",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "priority": 21,
+      "capabilities": [
+        "text",
+        "image"
+      ],
+      "defaultModel": "glm-4.6v-flash",
+      "models": [
+        "glm-4.6v-flash",
+        "glm-4v-flash"
+      ],
+      "limits": {
+        "note": "官方标为免费视觉模型。工具调用能力未核实，故 capabilities 不含 tools —— 声明错了比不声明更危险"
+      }
+    },
+    {
+      "id": "dashscope-text",
+      "label": "阿里云百炼文本（国内直连·每模型约100万token/90天）",
+      "apiKeyEnv": "DASHSCOPE_API_KEY",
+      "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "priority": 10,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "qwen-plus",
+      "models": [
+        "qwen-plus",
+        "qwen-turbo"
+      ],
+      "limits": {
+        "note": "每模型独立额度约100万token、90天到期且不补发不重置；仅华北2(北京)地域；同实名主体重注册不能重领"
+      }
+    },
+    {
+      "id": "dashscope-vision",
+      "label": "阿里云百炼视觉（国内直连）",
+      "apiKeyEnv": "DASHSCOPE_API_KEY",
+      "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "priority": 11,
+      "capabilities": [
+        "text",
+        "image"
+      ],
+      "defaultModel": "qwen-vl-plus",
+      "models": [
+        "qwen-vl-plus",
+        "qwen-vl-max"
+      ],
+      "limits": {
+        "note": "免费额度是否覆盖 VL 系列未核实；用 probe 核实"
+      }
+    },
+    {
+      "id": "siliconflow",
+      "label": "硅基流动（国内直连·免费模型名单未核实）",
+      "apiKeyEnv": "SILICONFLOW_API_KEY",
+      "baseURL": "https://api.siliconflow.cn/v1",
+      "priority": 40,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "Qwen/Qwen3-8B",
+      "models": [
+        "Qwen/Qwen3-8B",
+        "Qwen/Qwen2.5-7B-Instruct"
+      ],
+      "limits": {
+        "note": "官方标有免费模型，但本轮未能核实具体额度与能力，入池前先 probe"
+      }
+    },
+    {
+      "id": "qianfan-text",
+      "label": "百度千帆文本 ernie-4.5-turbo-128k（国内直连·实测 7 token）",
+      "apiKeyEnv": "QIANFAN_API_KEY",
+      "baseURL": "https://qianfan.baidubce.com/v2",
+      "priority": 13,
+      "capabilities": [
+        "text"
+      ],
+      "defaultModel": "ernie-4.5-turbo-128k",
+      "models": [
+        "ernie-4.5-turbo-128k"
+      ],
+      "limits": {
+        "note": "实测 2026-10-09：HTTP 200 / 7 token。该账号只开通了 ernie-4.5 系列，其他模型名报 does not exist"
+      }
+    },
+    {
+      "id": "qianfan-vision",
+      "label": "百度千帆视觉 ernie-4.5-turbo-vl（国内直连·实测 5 token·最省）",
+      "apiKeyEnv": "QIANFAN_API_KEY",
+      "baseURL": "https://qianfan.baidubce.com/v2",
+      "priority": 14,
+      "capabilities": [
+        "text",
+        "image"
+      ],
+      "defaultModel": "ernie-4.5-turbo-vl",
+      "models": [
+        "ernie-4.5-turbo-vl"
+      ],
+      "limits": {
+        "note": "实测 2026-10-09：HTTP 200 / 5 token，目前最省。VL = 视觉模型，识图能力待补测"
+      }
+    },
+    {
+      "id": "local-ollama",
+      "label": "本地 Ollama（按需启用·当前关闭）",
+      "enabled": false,
+      "local": true,
+      "baseURL": "http://127.0.0.1:11434/v1",
+      "priority": 90,
+      "capabilities": [
+        "text",
+        "image",
+        "tools"
+      ],
+      "defaultModel": "qwen2.5vl:3b",
+      "models": [
+        "qwen2.5vl:3b",
+        "qwen3:4b"
+      ],
+      "limits": {
+        "note": "不消耗任何额度。8GB 显存（MuMu 占 3.9GB 后剩约 4.2GB）建议 3B~4B；关掉 MuMu 可上 7B~8B。Ollama 默认空闲5分钟卸载模型"
+      }
+    },
+    {
+      "id": "ark-coding-plan",
+      "label": "火山方舟 Coding Plan（订阅制·付费）· 仅手动使用",
+      "apiKeyEnv": "ARK_API_KEY",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "priority": 100,
+      "manualOnly": true,
+      "capabilities": [
+        "text",
+        "image",
+        "tools"
+      ],
+      "defaultModel": "deepseek-v4-1-flash-260910",
+      "models": [
+        "deepseek-v4-1-flash-260910"
+      ],
+      "limits": {
+        "note": "订阅额度。baseURL 必须是 /api/coding/v3，且只有 coding plan 支持的模型能打这条通道；ep-xxx 接入点只能走 /api/v3"
+      }
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini 免费层（海外网络·本机实测不可达，默认禁用）",
+      "enabled": false,
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "priority": 200,
+      "capabilities": [
+        "text",
+        "image",
+        "tools"
+      ],
+      "defaultModel": "gemini-2.5-flash",
+      "models": [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite"
+      ],
+      "limits": {
+        "note": "本轮调研在本机 DNS 直接不解析。如果你有可用的海外网络，把 enabled 改成 true"
+      }
+    },
+    {
+      "id": "groq",
+      "label": "Groq 免费层（海外网络·本机实测不可达，默认禁用）",
+      "enabled": false,
+      "apiKeyEnv": "GROQ_API_KEY",
+      "baseURL": "https://api.groq.com/openai/v1",
+      "priority": 210,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "llama-3.3-70b-versatile",
+      "models": [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
+      ],
+      "limits": {
+        "note": "本轮调研 403。需要海外网络"
+      }
+    },
+    {
+      "id": "cerebras",
+      "label": "Cerebras（无永久免费层·须绑卡，默认禁用）",
+      "enabled": false,
+      "apiKeyEnv": "CEREBRAS_API_KEY",
+      "baseURL": "https://api.cerebras.ai/v1",
+      "priority": 220,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "gpt-oss-120b",
+      "models": [
+        "gpt-oss-120b",
+        "qwen-3.8-27b"
+      ],
+      "limits": {
+        "note": "官方明文：无永久免费层，$5 试用额度30天过期，且必须绑已验证支付方式才激活"
+      }
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter 免费池（海外网络·仅长尾模型，默认禁用）",
+      "enabled": false,
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "baseURL": "https://openrouter.ai/api/v1",
+      "priority": 230,
+      "capabilities": [
+        "text"
+      ],
+      "defaultModel": "inclusionai/ling-3.1-flash",
+      "models": [
+        "inclusionai/ling-3.1-flash",
+        "cohere/north-mini-code:free"
+      ],
+      "headers": {
+        "x-title": "llm-router"
+      },
+      "limits": {
+        "note": "实测469个模型里仅19个是零价；同时具备 vision+tools 的只有7个且全是长尾厂商。RPD 数值官方未给，别按固定值做容量规划"
+      }
+    }
+  ]
+}
