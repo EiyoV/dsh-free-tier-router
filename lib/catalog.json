@@ -49,15 +49,33 @@
     },
     {
       "id": "volcano",
-      "label": "火山方舟（你已有 key）",
+      "label": "火山方舟 Coding Plan（订阅制）",
       "priorityHint": 100,
       "registerUrl": "https://console.volcengine.com/ark",
       "materials": "已配置",
       "apiKeyEnv": "ARK_API_KEY",
       "baseURL": "https://ark.cn-beijing.volces.com/api/coding/v3",
-      "verified": "本机实测可用（工具调用 + 图片输入均通过）",
+      "verified": "本机实测可用（工具调用 + 图片输入均通过）。⚠️ 订阅制通道：超额只报 429（5 小时窗口），**不会欠费**",
       "knownModels": ["deepseek-v4-1-flash-260910"],
-      "capabilitiesHint": "付费订阅，当兜底用。注意 /api/coding/v3 与 /api/v3 是两条不同通道",
+      "capabilitiesHint": "订阅额度，当兜底用。注意 /api/coding/v3 与 /api/v3 是两条不同通道",
+      "confidence": "high"
+    },
+    {
+      "id": "volcano-endpoints",
+      "label": "火山方舟 接入点池（按量 · 每模型每天有额度）",
+      "priorityHint": 5,
+      "registerUrl": "https://console.volcengine.com/ark",
+      "materials": "已配置",
+      "apiKeyEnv": "ARK_API_KEY",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+      "verified": "2026-10-10 实测：接入点（ep-m-...）可调；**模型名直调返回 404**（需先在控制台开通）；账号欠费时所有接入点一律 403 overdue balance",
+      "knownModels": ["ep-m-20261009230644-4rkgc"],
+      "capabilitiesHint": "每个模型每天约 200 万 token 免费额度（部分挂「协作奖励计划」标签）—— 这是**周期性**额度，不是一次性。必须配 limits.perModel 做模型级熔断，烧完一个自动换下一个",
+      "caveats": [
+        "接入点 ID 必须从控制台「在线推理 → 接入点」抄；用模型名直调多为 404",
+        "欠费是账号级状态：一旦欠费，所有按量接入点一律 403，和额度够不够无关",
+        "接入点 ep-xxx 只能走 /api/v3，打 /api/coding/v3 会报 UnsupportedModel"
+      ],
       "confidence": "high"
     },
     {
