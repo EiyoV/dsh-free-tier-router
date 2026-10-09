@@ -138,7 +138,20 @@
 > 模型清单别手抄：`/api/v3/models` 会返回一大堆**不能对话**的模型
 > （embedding、视频生成、图片编辑…）。真打一发 `max_tokens=1` 的请求才算数。
 
-### 示例：一个渠道配多个账号
+### 多账号怎么配：先分清模型 ID 是不是"账号内资源"
+
+| | 模型名是**平台级**的 | 模型 ID 是**账号内资源**的 |
+|---|---|---|
+| 例子 | 百炼 `qwen-plus`、腾讯 `deepseek-v4-pro`、千帆 `ernie-4.5-turbo-128k`、智谱 `glm-4.7-flash` | **火山方舟接入点 `ep-m-...`**（每个账号单独创建） |
+| 换 key 能打吗 | ✅ 任何账号的 key 都能调同一个模型名 | ❌ 账号 A 的接入点，用账号 B 的 key 打**必然 404** |
+| 怎么加账号 | 可以 `apiKeyEnvs` 放多把 key；**但想让额度算得准，仍推荐一个账号一个 provider** | **必须一个账号一个 provider**，各自 pin 自己的 key + 自己的接入点列表 |
+
+**判断方法**：如果需要"先在控制台为某个账号单独创建这个 ID"，它就是账号内资源。
+
+**回答一个常见疑问**：加新账号**不会**影响老账号 —— 老 provider 原样留着，它的模型照旧能用；
+两个账号的接入点 ID 也**必然不同**（即使是同一个模型，两个账号各创建一个接入点，ID 也不一样）。
+
+#### 示例 A：平台级模型名（可以用 apiKeyEnvs）
 
 ```json
 {
@@ -152,15 +165,48 @@
 }
 ```
 
-对应的 `.env`：
+#### 示例 B：账号内资源（火山接入点，必须一账号一 provider）
 
-```
-QIANFAN_API_KEY=bce-v3/ALTAK-xxx/yyy
-QIANFAN_API_KEY_2=bce-v3/ALTAK-aaa/bbb
+```json
+[
+  {
+    "id": "ark-account-1",
+    "label": "火山方舟 账号1",
+    "apiKeyEnv": "ARK_API_KEY",
+    "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+    "priority": 5,
+    "capabilities": ["text", "tools"],
+    "defaultModel": "ep-m-AAAAAAAAAAAA-aaaaa",
+    "models": ["ep-m-AAAAAAAAAAAA-aaaaa", "ep-m-BBBBBBBBBBBB-bbbbb"],
+    "limits": { "perModel": true, "tokens": 2000000, "window": "day", "softRatio": 0.9, "hardRatio": 0.95 }
+  },
+  {
+    "id": "ark-account-2",
+    "label": "火山方舟 账号2",
+    "apiKeyEnv": "ARK_API_KEY_2",
+    "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+    "priority": 6,
+    "capabilities": ["text", "tools"],
+    "defaultModel": "ep-m-CCCCCCCCCCCC-ccccc",
+    "models": ["ep-m-CCCCCCCCCCCC-ccccc"],
+    "limits": { "perModel": true, "tokens": 2000000, "window": "day", "softRatio": 0.9, "hardRatio": 0.95 }
+  }
+]
 ```
 
-> ⚠️ **同一个账号建多把 key 是共享账号额度的。** 多把 key 只在不同账号时才有独立额度。
-> 命令行加账号：`node add-account.mjs qianfan-text "<新key>"`
+要点：
+
+- **各自用 `apiKeyEnv`（单数）**，不是 `apiKeyEnvs` —— 一把 key 只管自己那批接入点
+- **不要给它们配同一个 `limits.group`** —— 不同账号的额度本来就独立，配了 group 会把两份额度算成一份
+- 加账号 = **新增一个 provider**，老 provider 一个字都不用改
+
+> ⚠️ **同一个账号建多把 key 是共享账号额度的**，多把 key 只在**不同账号**时才是独立额度。
+> 命令行加账号：`node add-account.mjs <providerId> "<新key>"`
+
+> ⚠️ **配错的症状**：把账号 A 的接入点和账号 B 的 key 混在同一个 provider 里，
+> A 的接入点会被 B 的 key 打成 `404 does not exist or you do not have access to it`，
+> 按本项目的分类 404 属**模型级失败** → 那个模型被冷却。
+> 表现出来是"模型莫名其妙不可用"，其实只是 key 和接入点串了。
 
 ## 怎么确定模型名
 
