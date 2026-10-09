@@ -8,7 +8,7 @@
 cd E:\工程\AI\workspace\llm-router\dsh-plugin
 
 # 1) 确认 package.json 里的 private 已删除（发布必需）
-#    当前已经是可发布状态，name = dsh-llm-router-panel
+#    当前已经是可发布状态，name = dsh-free-tier-router
 
 # 2) 先看会被发布哪些文件（不会真的发）
 node ..\pack.mjs           # 打 zip 预览
@@ -24,11 +24,11 @@ npm publish --access public
 发完之后别人这样装：
 
 ```powershell
-dsh plugin --profile <profile名> add dsh-llm-router-panel
+dsh plugin --profile <profile名> add dsh-free-tier-router
 ```
 
-**包名冲突**：`dsh-llm-router-panel` 如果已被占用，改 `package.json` 的 `name`
-（比如加自己的前缀 `你的名字-dsh-llm-router-panel`），然后同步改 `cordis.patch.yml`
+**包名冲突**：`dsh-free-tier-router` 如果已被占用，改 `package.json` 的 `name`
+（比如加自己的前缀 `你的名字-dsh-free-tier-router`），然后同步改 `cordis.patch.yml`
 里 `insert` 的 `name` 字段 —— **两处必须一致**，否则挂载不上。
 
 ## 方式 B：发到 GitHub（不需要 npm 账号）
@@ -37,15 +37,15 @@ dsh plugin --profile <profile名> add dsh-llm-router-panel
 # 1) 把 dsh-plugin/ 目录推到一个公开仓库
 git init
 git add .
-git commit -m "dsh-llm-router-panel v1.0.0"
-git remote add origin https://github.com/你的用户名/dsh-llm-router-panel.git
+git commit -m "dsh-free-tier-router v1.0.0"
+git remote add origin https://github.com/你的用户名/dsh-free-tier-router.git
 git push -u origin main
 ```
 
 别人这样装：
 
 ```powershell
-dsh plugin --profile <profile名> add github:你的用户名/dsh-llm-router-panel
+dsh plugin --profile <profile名> add github:你的用户名/dsh-free-tier-router
 ```
 
 ## 发布前自检

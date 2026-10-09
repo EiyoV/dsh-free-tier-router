@@ -1,5 +1,5 @@
 {
-  "name": "dsh-llm-router-panel",
+  "name": "dsh-free-tier-router",
   "version": "1.0.0",
   "description": "多平台免费 LLM 渠道池：自动 fallback、按任务挑渠道（识图/工具）、按实测 token 成本自动排序优先级",
   "license": "MIT",

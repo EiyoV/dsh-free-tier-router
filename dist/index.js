@@ -1,5 +1,5 @@
 /**
- * dsh-llm-router-panel —— Host 侧（**自包含**：代理内核内嵌，不依赖外部项目）。
+ * dsh-free-tier-router —— Host 侧（**自包含**：代理内核内嵌，不依赖外部项目）。
  *
  * 干四件事：
  *   1. 在 DSH 进程内启动 llm-router 代理（127.0.0.1:8787）
@@ -30,7 +30,7 @@ import { HealthRegistry } from '../lib/health.mjs';
 import { startProxy } from '../lib/server.mjs';
 import { fetchBalance, clearBalanceCache } from '../lib/balance.mjs';
 
-const name = 'dsh-llm-router-panel';
+const name = 'dsh-free-tier-router';
 const inject = ['webServer'];
 
 function sendJson(res, status, obj) {

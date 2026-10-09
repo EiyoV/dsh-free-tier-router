@@ -3,7 +3,7 @@
  *
  *   node pack.mjs
  *
- * 产物：../dist-package/dsh-llm-router-panel-<版本>.zip
+ * 产物：../dist-package/dsh-free-tier-router-<版本>.zip
  * 目标机器上解压后跑 `node install.mjs` 即可（需要 Node；DSH 自带的那个也行）。
  */
 import { mkdirSync, rmSync, cpSync, readFileSync, existsSync, statSync, readdirSync } from 'node:fs';

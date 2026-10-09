@@ -1,5 +1,5 @@
 /**
- * 把 dsh-llm-router-panel 装进 DSH profile（幂等，可反复跑）。
+ * 把 dsh-free-tier-router 装进 DSH profile（幂等，可反复跑）。
  *
  *   node install.mjs                    安装 / 更新到 desktop profile
  *   node install.mjs --profile headless 指定 profile
@@ -20,7 +20,13 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PLUGIN = 'dsh-llm-router-panel';
+const PLUGIN = 'dsh-free-tier-router';
+
+/**
+ * 改过名的旧包名。安装时顺手从 profile 里清掉 ——
+ * 否则新旧两个包会同时挂在 profile 里，旧的那个找不到源码还会刷错误日志。
+ */
+const LEGACY_NAMES = ['dsh-llm-router-panel'];
 
 const argv = process.argv.slice(2);
 const remove = argv.includes('--remove');
@@ -85,6 +91,18 @@ manifest.dsh ??= {};
 manifest.dsh.profile ??= {};
 manifest.dsh.profile.bundles ??= [];
 
+// 清理改名前的旧条目，避免新旧两个包同时挂着
+for (const oldName of LEGACY_NAMES) {
+  if (manifest.dependencies[oldName] !== undefined) {
+    delete manifest.dependencies[oldName];
+    console.log(`已从 dependencies 移除改名前的旧包 -> ${oldName}`);
+  }
+  if (manifest.dsh.profile.bundles.includes(oldName)) {
+    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter((b) => b !== oldName);
+    console.log(`已从 dsh.profile.bundles 移除改名前的旧包 -> ${oldName}`);
+  }
+}
+
 if (remove) {
   delete manifest.dependencies[PLUGIN];
   manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter((b) => b !== PLUGIN);
@@ -120,6 +138,15 @@ if (!remove) {
   if (existsSync(legacyDir)) {
     rmSync(legacyDir, { recursive: true, force: true });
     console.log('已清理早期手动安装的残留 ->', legacyDir);
+  }
+
+  // 改名前的旧包目录
+  for (const oldName of LEGACY_NAMES) {
+    const oldDir = join(PROFILE_DIR, 'node_modules', oldName);
+    if (existsSync(oldDir)) {
+      rmSync(oldDir, { recursive: true, force: true });
+      console.log(`已删除改名前的旧包目录 -> ${oldName}`);
+    }
   }
 }
 

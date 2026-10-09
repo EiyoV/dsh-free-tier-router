@@ -1,4 +1,4 @@
-# dsh-llm-router-panel
+# dsh-free-tier-router
 
 DSH 插件：**自带代理内核**的多平台 LLM 渠道池。
 
@@ -67,7 +67,7 @@ node add-account.mjs --list                    # 看每个渠道有几把
 
 ## 换台电脑怎么用
 
-1. 拿到 `dsh-llm-router-panel-0.1.0.zip`（在项目 `dist-package/` 下，或自己跑 `node dsh-plugin/pack.mjs` 生成）
+1. 拿到 `dsh-free-tier-router-1.0.0.zip`（在项目 `dist-package/` 下，或自己跑 `node dsh-plugin/pack.mjs` 生成）
 2. 解压到任意目录
 3. 在该目录执行：
    ```powershell
@@ -84,7 +84,7 @@ node add-account.mjs --list                    # 看每个渠道有几把
 | 位置 | 内容 | 生效 |
 |---|---|---|
 | 设置 → **渠道池** | 独立选项面板（client 侧） | 需重启 DSH |
-| 设置 → **插件** | 列表里一条 `sourceType=local` 的 `dsh-llm-router-panel`，可启停 | 安装后即有 |
+| 设置 → **插件** | 列表里一条 `sourceType=local` 的 `dsh-free-tier-router`，可启停 | 安装后即有 |
 | `/llm-router` | 同一份面板的直达地址 | 重启后可用 |
 | `/api/llm-router/*` | `status` / `catalog` / `action` / `save-key` | 重启后可用 |
 
@@ -146,7 +146,7 @@ node test\verify-package.mjs       # 解压到临时目录验证包是自包含�
 - `cordis.patch.yml` 里的路径用**正斜杠**：YAML 双引号里的反斜杠是转义符，中文路径必踩。
 - `package.json` 的 `name` 必须与 patch 里的 `name` 完全一致。
 - `file:` 依赖会被 pnpm 按 `files` 字段打包复制 —— 改了 `files` 或加了新目录（如 `lib/`）后，
-  必须先删掉 `node_modules/dsh-llm-router-panel` 再装，否则 pnpm 认为"无事可做"（实测输出 `Packages: -10`），
+  必须先删掉 `node_modules/dsh-free-tier-router` 再装，否则 pnpm 认为"无事可做"（实测输出 `Packages: -10`），
   新文件不会同步过去。`install.mjs` 已经自动处理这一步。
 - 用 Node 改 JSON，不要用 PowerShell `Set-Content`：这台机器的 `pwsh` 是 Windows PowerShell 5.1，写无 BOM 的 UTF-8 会出问题。
 - 安装必须用 DSH 自带的 pnpm：`dsh plugin --profile desktop ...` 会被 CLI 硬拒绝（源码写死 desktop 由 Electron 独占管理）。

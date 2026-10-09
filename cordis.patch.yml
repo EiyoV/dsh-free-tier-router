@@ -1,4 +1,4 @@
-# dsh-llm-router-panel bundle layer
+# dsh-free-tier-router bundle layer
 # profile 在 dsh.profile.bundles 里列出本包时，这一层会被自动应用。
 #
 # 注意：`name` 是**包名**（经 profile 的 node_modules 或安装级 fallback
@@ -8,7 +8,7 @@
 # 首次加载时自动从插件内置模板生成。这样换台电脑解压安装就能用。
 - insert:
     - id: llm-router-panel
-      name: dsh-llm-router-panel
+      name: dsh-free-tier-router
       config:
         # 代理监听端口。若该端口上已有另一个 llm-router 在跑（例如独立项目的 start.cmd），
         # 插件会自动复用它，不会重复启动。

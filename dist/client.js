@@ -1,5 +1,5 @@
 /**
- * dsh-llm-router-panel —— client 侧（在「设置」里注册一个独立选项面板）。
+ * dsh-free-tier-router —— client 侧（在「设置」里注册一个独立选项面板）。
  *
  * 面板本体是 Host 提供的 /llm-router 页面，这里用 iframe 嵌进来。
  * 这样管理界面只有一份实现：不必用 React 重写一遍表格、按钮和目录渲染，
@@ -16,11 +16,11 @@
     injected = react;
   }
   function getReact() {
-    if (!injected) throw new Error('[dsh-llm-router-panel] React 尚未注入：entry 需先调用 provideReact()');
+    if (!injected) throw new Error('[dsh-free-tier-router] React 尚未注入：entry 需先调用 provideReact()');
     return injected;
   }
 
-  const NS = 'dsh-llm-router-panel';
+  const NS = 'dsh-free-tier-router';
   const zh = { tab: '渠道池', title: 'llm-router 渠道池' };
   const en = { tab: 'LLM Router', title: 'llm-router channel pool' };
 
@@ -31,7 +31,7 @@
 
     ctx.effect(
       () => ctx.locale.register(NS, { zh, en }),
-      'dsh-llm-router-panel: dictionaries'
+      'dsh-free-tier-router: dictionaries'
     );
     const t = ctx.locale.bind(NS);
 
@@ -65,12 +65,12 @@
             () => React.createElement(RouterPanel)
           )
         ),
-      'dsh-llm-router-panel: settings section'
+      'dsh-free-tier-router: settings section'
     );
   }
 
   window.__ModuleLoader__.load({
-    id: 'dsh-llm-router-panel',
+    id: 'dsh-free-tier-router',
     factory: (require) => {
       provideReact(require('react'));
       return { apply, inject };
