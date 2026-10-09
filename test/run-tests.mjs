@@ -12,7 +12,7 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startMock } from './mock-upstreams.mjs';
-import { normalizeBudget, parseWindow } from '../lib/budget.mjs';
+import { normalizeBudget, parseWindow, BudgetTracker } from '../lib/budget.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TMP = resolve(ROOT, 'test', '.tmp');
@@ -508,6 +508,35 @@ async function main() {
       check('请求被挡住并改由次选接手', contentOf(r) === 'OK from mOK2', `content=${JSON.stringify(contentOf(r))}`);
 
       await router.stop();
+    }
+
+    // 8.7 budget.group：同一账号下的多个渠道共享同一份额度
+    //     （腾讯的文本渠道和视觉渠道就是这种关系：同一把 key、同一份额度）
+    {
+      const bt = new BudgetTracker({ path: resolve(TMP, 'group-test.json') });
+      const mk = (id) => ({
+        id,
+        budget: normalizeBudget({ group: 'acc', tokens: 100, window: 'total', softRatio: 0.5, hardRatio: 0.9 }),
+        defaultModel: 'm',
+        models: ['m'],
+      });
+      const textA = mk('text-a');
+      const visionB = mk('vision-b');
+
+      bt.observe(textA, { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 }, null);
+
+      const a = bt.assess(textA);
+      const b = bt.assess(visionB);
+      check(
+        '同 group 的两个渠道看到同一份用量（不会各自以为还有全额）',
+        a.usedTokens === 40 && b.usedTokens === 40,
+        JSON.stringify({ textA: a.usedTokens, visionB: b.usedTokens })
+      );
+      check(
+        '共享额度的比例也一致',
+        a.ratio === b.ratio && a.ratio === 0.4,
+        JSON.stringify({ a: a.ratio, b: b.ratio })
+      );
     }
 
     // ── 场景 9：同一个渠道下的多个模型各自记额度（火山方舟那类）────────
