@@ -16,6 +16,16 @@
       "maxMs": 3600000
     }
   },
+  "visionPreprocess": {
+    "enabled": true,
+    "provider": "",
+    "model": "",
+    "detail": "detailed",
+    "maxDescTokens": 900,
+    "timeoutMs": 60000,
+    "cacheSize": 200,
+    "note": "图片预处理：请求里的 image part 会先交给一个**只需 image 能力**的渠道转写成文字，替换后再按 [text, tools] 正常路由。动机：只要对话历史里带图，之后**每一轮**请求都会被判成需要 image + tools，整条会话被钉死在少数多模态渠道上（本机实测：全池只剩腾讯一条腿，它一熔断带图对话就全线 503）。转写结果按图片内容 hash 缓存，同一张历史图只转写一次。provider/model 留空 = 自动挑当前优先级最高的 image 渠道；也可以显式写 tencent-vision-tools 之类。detail=detailed 会把图中可见文字逐字转写，尽量保住「图里的信息」而不只是「知道是什么图」；改 brief 则只出一两句概括（更省）。转写失败一律保留原图、不影响路由。注意：转写调用直接打上游、不经过额度熔断（单次消耗小且有缓存）；要完全停用把 enabled 改成 false。**代价**：有损，主模型看到的是描述而不是原图，无法就图中细节反复追问。"
+  },
   "providers": [
     {
       "id": "zhipu-text",
@@ -40,7 +50,7 @@
       "label": "智谱 GLM 免费视觉模型（国内直连·手机自动化主力候选）",
       "apiKeyEnv": "ZHIPU_API_KEY",
       "baseURL": "https://open.bigmodel.cn/api/paas/v4",
-      "priority": 21,
+      "priority": 15,
       "capabilities": [
         "text",
         "image"
@@ -59,7 +69,7 @@
       "label": "阿里云百炼文本（国内直连·每模型约100万token/90天）",
       "apiKeyEnv": "DASHSCOPE_API_KEY",
       "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "priority": 10,
+      "priority": 12,
       "capabilities": [
         "text",
         "tools"
@@ -83,7 +93,7 @@
       "label": "阿里云百炼视觉（国内直连）",
       "apiKeyEnv": "DASHSCOPE_API_KEY",
       "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "priority": 11,
+      "priority": 13,
       "capabilities": [
         "text",
         "image"
@@ -102,7 +112,7 @@
       "label": "硅基流动（国内直连·免费模型名单未核实）",
       "apiKeyEnv": "SILICONFLOW_API_KEY",
       "baseURL": "https://api.siliconflow.cn/v1",
-      "priority": 40,
+      "priority": 15,
       "capabilities": [
         "text",
         "tools"
@@ -121,7 +131,7 @@
       "label": "百度千帆文本 ernie-4.5-turbo-128k（国内直连·实测 7 token）",
       "apiKeyEnv": "QIANFAN_API_KEY",
       "baseURL": "https://qianfan.baidubce.com/v2",
-      "priority": 13,
+      "priority": 11,
       "capabilities": [
         "text",
         "tools"
@@ -139,7 +149,7 @@
       "label": "百度千帆视觉 ernie-4.5-turbo-vl（国内直连·实测 5 token·最省）",
       "apiKeyEnv": "QIANFAN_API_KEY",
       "baseURL": "https://qianfan.baidubce.com/v2",
-      "priority": 14,
+      "priority": 10,
       "capabilities": [
         "text",
         "image"
@@ -150,6 +160,151 @@
       ],
       "limits": {
         "note": "实测 2026-10-09：HTTP 200 / 5 token，目前最省。VL = 视觉模型，识图能力待补测"
+      }
+    },
+    {
+      "id": "tencent-vision-tools",
+      "label": "腾讯 tokenhub 视觉+工具（deepseek-v4-flash-vision）",
+      "apiKeyEnv": "TENCENT_TOKENHUB_API_KEY",
+      "baseURL": "https://tokenhub.tencentmaas.com/v1",
+      "priority": 12,
+      "enabled": true,
+      "capabilities": [
+        "text",
+        "image",
+        "tools"
+      ],
+      "defaultModel": "deepseek/deepseek-v4-flash-vision-exp",
+      "models": [
+        "deepseek/deepseek-v4-flash-vision-exp"
+      ],
+      "limits": {
+        "note": "唯一同时具备「识图 + function calling」的免费渠道：请求需要 [image, tools] 时若没有它，全池报 503「没有可用上游」。实测 deepseek/deepseek-v4-flash-vision-exp 两者都行（hunyuan-t1-vision 识图好但不调工具，故不并入本渠道）。额度与 tencent-vision / tencent-tokenhub 同 key 同份额度，用 group 共享计数器。⚠️ 复核：group 累计到 90.5% 时本渠道曾被自己的 hardRatio 0.9 掐死 → 全池再无 [image, tools]，带图对话直接 503；而直连实测该模型当时仍 HTTP 200 + tool_calls 正常，说明本地计数器比真实上游保守。故本渠道 hardRatio 抬到 1：吃满共享额度再停；tencent-tokenhub / tencent-vision 保持 0.9，把剩余额度让给这个唯一必需的组合。腾讯未开后付费、用尽自动停，无欠费风险。",
+        "group": "tencent-tokenhub",
+        "tokens": 1000000,
+        "window": "total",
+        "softRatio": 0.8,
+        "hardRatio": 1
+      }
+    },
+    {
+      "id": "tencent-vision",
+      "label": "腾讯 TokenHub 视觉（混元 T1-Vision · 截图识别专用）",
+      "apiKeyEnv": "TENCENT_TOKENHUB_API_KEY",
+      "baseURL": "https://tokenhub.tencentmaas.com/v1",
+      "priority": 12,
+      "capabilities": [
+        "text",
+        "image"
+      ],
+      "defaultModel": "hunyuan-t1-vision-20250916",
+      "models": [
+        "hunyuan-t1-vision-20250916",
+        "deepseek/deepseek-v4-flash-vision-exp"
+      ],
+      "limits": {
+        "note": "和 tencent-tokenhub 是同一把 key、同一份额度 → 用 group 让两者共用一个计数器（不共享的话会各自以为还有 100 万，熔断就偏晚一倍）。实测：hunyuan-t1-vision 能正确识图且 reasoning_tokens=0（不思考、快，适合截图循环）；而 glm-5.3-flash 这类纯文本模型对图片会返回 200 然后瞎编，所以视觉模型必须单独成一个渠道，不能混进文本渠道",
+        "group": "tencent-tokenhub",
+        "tokens": 1000000,
+        "window": "total",
+        "softRatio": 0.8,
+        "hardRatio": 0.9
+      }
+    },
+    {
+      "id": "tencent-tokenhub",
+      "label": "腾讯云 TokenHub（混元 + DeepSeek/GLM/Kimi/MiniMax 聚合）",
+      "apiKeyEnv": "TENCENT_TOKENHUB_API_KEY",
+      "baseURL": "https://tokenhub.tencentmaas.com/v1",
+      "priority": 13,
+      "capabilities": [
+        "text",
+        "tools",
+        "image"
+      ],
+      "defaultModel": "deepseek-v4-pro",
+      "models": [
+        "deepseek-v4-pro",
+        "mimo-v2.6-flash",
+        "kimi-k2.6",
+        "step-5-preview",
+        "glm-5.3-flash",
+        "hy4-preview",
+        "deepseek/deepseek-flash",
+        "mimo-v2.6-pro",
+        "kimi-k2.7-code",
+        "kimi-k2.7-code-highspeed",
+        "glm-5.2",
+        "hy3",
+        "glm-5.3-flashx",
+        "glm-5.3",
+        "hunyuan-t1-vision-20250916",
+        "deepseek/deepseek-v4-flash-vision-exp",
+        "deepseek-v4-flash-202605",
+        "deepseek-v4.1-flash",
+        "minimax-m2.7",
+        "deepseek-v4-pro-0813",
+        "deepseek-v4-pro-202606",
+        "kimi-k3",
+        "kimi-k2.8-preview",
+        "minimax-m3"
+      ],
+      "limits": {
+        "note": "新人体验包：每个语言模型各 100 万 token（活动至 2026-12-31；官方对有效期有 90 天/1 年两种口径）。官方明文「免费额度用尽后，如果未开启后付费，服务将自动停止」—— 实测印证：语音/音乐类模型直接返回 402「No free trial quota ... postpaid billing is not enabled」，而语言模型全部 200。⚠️ 官方对「每模型独立」与「主账号下所有模型共享」说法矛盾，故按账号级保守算。模型清单是实测出来的（49 个候选里 29 个能对话），前 7 个已验证 function calling 可用（tool_calls 正常返回）｜capabilities 必须带 image —— 该渠道模型列表里有 hunyuan-t1-vision-20250916 等视觉模型，漏声明会导致「图片+工具」的请求被全线排除、报 503。",
+        "group": "tencent-tokenhub",
+        "tokens": 1000000,
+        "window": "total",
+        "softRatio": 0.8,
+        "hardRatio": 0.9
+      }
+    },
+    {
+      "id": "ark-endpoints",
+      "label": "火山方舟接入点池（每个模型各自有日额度 · 模型级熔断）",
+      "apiKeyEnv": "ARK_API_KEY",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+      "priority": 16,
+      "enabled": false,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "ep-替换成你自己的接入点ID",
+      "models": [
+        "ep-替换成你自己的接入点ID"
+      ],
+      "limits": {
+        "note": "⚠️ 模板里默认关闭：ep-xxx 是每个火山账号**自己创建**的接入点 ID，复制别人的无效。用法：在方舟控制台创建接入点，只挑**带「协作奖励计划」标签**的（那些才有每天约 200 万免费 token），把 ID 填进 defaultModel 与 models，再把 enabled 改成 true。阈值用 0.7/0.8 而不是 0.9：『协作奖励计划』需每天有调用才继续发券，断一天就失去免费额度，必须留足余量。⚠️ 实测教训：GLM-5.3-Flash / Doubao-Seed-2.1-lite / Doubao-Seed-2.0-lite 三个模型**没有免费额度**，调用即按量付费；混在 auto 池里（还当了 defaultModel）一天能烧掉 182 万 token 直接欠费 —— 这类必须放进 manualOnly 的 ark-payg。另注意：ep- 接入点只能走 /api/v3（按量），拿它打 /api/coding/v3 会返回 404 UnsupportedModel。",
+        "perModel": true,
+        "tokens": 2000000,
+        "window": "day",
+        "softRatio": 0.7,
+        "hardRatio": 0.8
+      }
+    },
+    {
+      "id": "ark-payg",
+      "label": "火山方舟 按量接入点（无免费额度 · 仅手动 · 防欠费）",
+      "apiKeyEnv": "ARK_API_KEY",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+      "priority": 60,
+      "enabled": false,
+      "manualOnly": true,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "ep-替换成你的按量接入点ID",
+      "models": [
+        "ep-替换成你的按量接入点ID"
+      ],
+      "limits": {
+        "note": "放**没有「协作奖励计划」标签**的接入点（调用即按量付费）。manualOnly = auto 模式永不选中，只有显式写 ark-payg::ep-xxx 才用；额度阈值故意压到很小（20 万、硬 70%）作为第二层保险。⚠️ 千万别把这些接入点放回 ark-endpoints —— 那正是当初一天烧掉 182 万 token 欠费的原因。",
+        "perModel": true,
+        "tokens": 200000,
+        "window": "day",
+        "softRatio": 0.5,
+        "hardRatio": 0.7
       }
     },
     {
@@ -260,14 +415,30 @@
       "enabled": false,
       "apiKeyEnv": "OPENROUTER_API_KEY",
       "baseURL": "https://openrouter.ai/api/v1",
-      "priority": 230,
+      "priority": 14,
       "capabilities": [
-        "text"
+        "text",
+        "image",
+        "tools"
       ],
-      "defaultModel": "inclusionai/ling-3.1-flash",
+      "defaultModel": "dots-studio/dots-3-note-preview:free",
       "models": [
         "inclusionai/ling-3.1-flash",
-        "cohere/north-mini-code:free"
+        "cohere/north-mini-code:free",
+        "dots-studio/dots-3-note-preview:free",
+        "thinkingmachines/inkling-small:free",
+        "thinkingmachines/inkling:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
+        "openrouter/free",
+        "apodex/apodex-1.1-mini:free",
+        "liquid/lfm-2.5-2.6b:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "poolside/laguna-s-2.1:free",
+        "poolside/laguna-xs-2.1:free",
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "nvidia/nemotron-3-super-120b-a12b:free"
       ],
       "headers": {
         "x-title": "llm-router"
