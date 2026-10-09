@@ -590,6 +590,46 @@ async function main() {
 
       await router.stop();
     }
+
+    // 9.3 按金额熔断：一次性代金券那类（防"券用完了自动转按量"导致欠费）
+    {
+      const router = await startRouter([
+        makeProvider('voucher-A', mOK, {
+          priority: 1,
+          // mock 每次回 5 prompt + 2 completion token；单价 100 元/百万 ⇒ 每次约 0.0007 元
+          limits: {
+            cost: 0.0005,
+            priceIn: 100,
+            priceOut: 100,
+            window: 'total',
+            softRatio: 0.9,
+            hardRatio: 1,
+          },
+        }),
+        makeProvider('backup-C', mOK2, { priority: 2 }),
+      ]);
+
+      const a0 = mOK.state.count;
+      const r1 = await router.chat({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] });
+      check('第一次仍在额度内', contentOf(r1) === 'OK from mOK', `content=${JSON.stringify(contentOf(r1))}`);
+
+      const h = (await router.health()).providers.find((p) => p.id === 'voucher-A').budget;
+      check(
+        '按元折算也能判定（来源=本地估算费用）',
+        h?.source === '本地估算费用' && h.state === 'hard',
+        JSON.stringify(h)
+      );
+
+      const r2 = await router.chat({ model: 'auto', messages: [{ role: 'user', content: 'again' }] });
+      check(
+        '金额用尽后自动切走 —— 这就是"代金券用超自动转按量"的防线',
+        contentOf(r2) === 'OK from mOK2',
+        `content=${JSON.stringify(contentOf(r2))}`
+      );
+      check('用尽后不再打那条渠道', mOK.state.count - a0 === 1, `实际 ${mOK.state.count - a0} 次`);
+
+      await router.stop();
+    }
   } finally {
     for (const m of allMocks) await m.close();
     rmSync(TMP, { recursive: true, force: true });
