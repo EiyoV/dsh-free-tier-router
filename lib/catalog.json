@@ -104,6 +104,27 @@
       "confidence": "high"
     },
     {
+      "id": "tencent-coding-plan",
+      "label": "腾讯 TokenHub Coding Plan / Token Plan（严禁 API 调用）",
+      "registerUrl": "https://cloud.tencent.com/document/product/1823/130092",
+      "materials": "腾讯云账号 + 付费订阅（Coding Plan Lite 40 元/月、Pro 200 元/月）",
+      "apiKeyEnv": "TENCENT_CODING_PLAN_KEY",
+      "baseURL": "https://api.lkeap.cloud.tencent.com/coding/v3",
+      "verified": "技术上确实给 OpenAI 兼容端点 + 专属 key（sk-sp-xxxx / sk-tp-xxxx），但官方「订阅前须知」第 2 条原文就是**「严禁 API 调用」**：仅限官方支持的那批交互式编程工具（Claude Code / CodeBuddy / Cursor / Cline / OpenClaw 等），禁止自动化脚本、自定义应用后端、任何非交互式批量调用，违规可暂停订阅或封禁 key。另外**不能与新人免费体验包叠加**（官方 FAQ：独立订阅产品）",
+      "deprecated": true,
+      "confidence": "high"
+    },
+    {
+      "id": "workbuddy",
+      "label": "腾讯 WorkBuddy（积分制客户端，不发 API key）",
+      "registerUrl": "https://www.workbuddy.cn/",
+      "materials": "腾讯云账号（体验版 500 积分/月）",
+      "apiKeyEnv": "WORKBUDDY_API_KEY",
+      "verified": "核实：WorkBuddy 是 TokenHub 的**消费端** —— 官方文档教你在它里面「添加自定义模型」并填入别人的 API Key，自己不签发任何 API Key；赠送的积分绑定账号登录态（会话 bearer token），不能导出。社区有 workbuddy-claude-bridge 一类逆向桥接，但明文违反 AUP §3.5（禁止逆向）§4（禁止未授权互操作组件/自动化软件）§5（不得共享登录凭据），后果是警告→限制→封号",
+      "deprecated": true,
+      "confidence": "high"
+    },
+    {
       "id": "cerebras",
       "label": "Cerebras（无永久免费层，勿当免费池）",
       "registerUrl": "https://cloud.cerebras.ai/",
