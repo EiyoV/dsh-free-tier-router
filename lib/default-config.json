@@ -22,18 +22,17 @@
       "label": "智谱 GLM 免费文本模型（国内直连）",
       "apiKeyEnv": "ZHIPU_API_KEY",
       "baseURL": "https://open.bigmodel.cn/api/paas/v4",
-      "priority": 20,
+      "priority": 9,
       "capabilities": [
         "text",
         "tools"
       ],
       "defaultModel": "glm-4.7-flash",
       "models": [
-        "glm-4.7-flash",
-        "glm-4-flash"
+        "glm-4.7-flash"
       ],
       "limits": {
-        "note": "官方模型总览页标为免费；RPM/TPM 未核实。模型 id 会变，务必用 npm run probe 核实"
+        "note": "官方模型总览页标为免费（长期限速免费、按 RPM 限速），额度未核实。默认排在前面：它是长期免费，而千帆/腾讯/百炼都是一次性新人额度，更该留着当备胎。实测（qq-bridge 真实 31 工具上下文）：glm-4.7-flash 6/6 正确调用；glm-4-flash 仅 2/6，且失败时返回 200+纯文本 → 会被当成成功而机器人拿不到工具调用，故不入列表。"
       }
     },
     {
