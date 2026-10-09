@@ -321,6 +321,12 @@ export async function apply(ctx, config = {}) {
             capabilitiesHint: ch.capabilitiesHint ?? null,
             caveats: ch.caveats ?? [],
             priorityHint: ch.priorityHint ?? 999,
+            /**
+             * 未入池的渠道靠它渲染"保存第一把 key"的按钮。
+             * ⚠️ 漏传过一次：面板拿到 undefined 会写成 data-savekey=""，
+             * 点保存被 save-key 接口以"变量名不合法"驳回 —— 表现就是"key 填了存不上"。
+             */
+            apiKeyEnv: ch.apiKeyEnv ?? null,
             /** config.json 里有没有对应 provider */
             inPool: matched.length > 0,
             enabled: matched.some((p) => p.enabled !== false),

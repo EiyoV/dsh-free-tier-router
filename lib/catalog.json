@@ -131,14 +131,14 @@
       "registerUrl": "https://console.cloud.tencent.com/tokenhub/",
       "materials": "腾讯云账号实名；新人体验包在控制台领取，或首次调用某模型时自动领取",
       "apiKeyEnv": "TENCENT_TOKENHUB_API_KEY",
-      "baseURL": "",
-      "verified": "2026-10 核实：官方写明新人免费额度「每个语言模型各 100 万 token」（活动至 2026-12-31，有效期 90 天，另一处官方口径写 1 年）；官方明文「免费额度用尽后，如果未开启后付费，服务将自动停止」—— 是少见的**不会自动转按量**的付费级平台",
-      "knownModels": ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5", "kimi-k2.6", "minimax-m2.7", "hy3-preview"],
+      "baseURL": "https://tokenhub.tencentmaas.com/v1",
+      "verified": "2026-10 核实：官方写明新人免费额度「每个语言模型各 100 万 token」（活动至 2026-12-31；官方对有效期有 90 天/1 年两种口径）；官方明文「免费额度用尽后，如果未开启后付费，服务将自动停止」—— 是少见的**不会自动转按量**的付费级平台。接口域名取自官方《API 使用说明》：广州 tokenhub.tencentmaas.com（备用 .cn）、新加坡 tokenhub-intl.tencentmaas.com，只支持同站点调用",
+      "knownModels": ["hy4-preview", "deepseek-v4-pro", "deepseek-v4-flash", "glm-5", "kimi-k2.6", "minimax-m2.7"],
       "capabilitiesHint": "一个 key 聚合 18 款语言模型（混元 4 + DeepSeek 5 + GLM 4 + Kimi/MiniMax 4），兼容 OpenAI 协议 —— 天然适合 limits.perModel 做模型级切换",
       "caveats": [
-        "baseURL 待核实（以控制台 API 文档为准，别照抄本目录）",
         "官方文档对「每模型独立」与「主账号下所有模型共享」两种说法并存，配额度时先按账号级保守算",
-        "免费额度用尽后不会自动转按量，但也意味着**不手动开后付费就用不了**（这反而是优点）"
+        "免费额度用尽后不会自动转按量，但也意味着**不手动开后付费就用不了**（这反而是优点）",
+        "模型 ID 以 `GET /v1/models` 为准（本目录列的是官方文档里出现过的，可能不全）"
       ],
       "confidence": "medium"
     },

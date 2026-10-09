@@ -15,8 +15,10 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PANEL = join(HERE, '..', 'dist', 'panel.html');
 const CLIENT = join(HERE, '..', 'dist', 'client.js');
+const INDEX = join(HERE, '..', 'dist', 'index.js');
 
 const html = readFileSync(PANEL, 'utf8');
+const indexJs = readFileSync(INDEX, 'utf8');
 
 // 抓最后一个 <script>...</script>（页面里只有一段内联脚本）
 const m = /<script>([\s\S]*?)<\/script>/.exec(html);
@@ -68,6 +70,14 @@ checkContains('面板有恢复时间格式化', html, 'function fmtTime', true);
 checkContains('面板有冷却文字逻辑', html, 'function coolingText', true);
 checkContains('面板有额度单元格', html, 'function quotaText', true);
 checkContains('面板有重置用量按钮', html, 'id="btn-reset-usage"', true);
+// 这个漏过一次：面板拿不到 apiKeyEnv 就会把保存按钮写成 data-savekey=""，
+// 点保存被接口以"变量名不合法"驳回 —— 用户看到的现象就是"key 填了存不上"。
+checkContains(
+  'catalog 接口把 apiKeyEnv 传给面板（否则未入池渠道的 key 存不上）',
+  indexJs,
+  'apiKeyEnv: ch.apiKeyEnv',
+  true
+);
 checkContains('已移除旧的「账号管理」区', html, 'id="accounts"', false);
 checkContains('已移除旧的按钮 id', html, 'btn-acct-add', false);
 
