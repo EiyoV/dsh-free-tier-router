@@ -68,12 +68,13 @@
       "materials": "已配置",
       "apiKeyEnv": "ARK_API_KEY",
       "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
-      "verified": "2026-10-10 实测：接入点（ep-m-...）可调；**模型名直调返回 404**（需先在控制台开通）；账号欠费时所有接入点一律 403 overdue balance",
-      "knownModels": ["ep-m-20261009230644-4rkgc"],
-      "capabilitiesHint": "每个模型每天约 200 万 token 免费额度（部分挂「协作奖励计划」标签）—— 这是**周期性**额度，不是一次性。必须配 limits.perModel 做模型级熔断，烧完一个自动换下一个",
+      "verified": "2026-10-10 实测：10 个接入点（ep-m-...）**全部 200 可用**；**模型名直调返回 404**（需先在控制台开通）；账号欠费时所有接入点一律 403 overdue balance（缴费后立即恢复，实测对照）",
+      "knownModels": ["ep-m-20261009230644-4rkgc", "ep-m-20261009230644-rn9vx", "ep-m-20261009230642-pnkfq"],
+      "capabilitiesHint": "每个模型每天约 200 万 token 免费额度（部分挂「协作奖励计划」标签）—— 这是**周期性**额度，不是一次性。必须配 limits.perModel 做模型级熔断，烧完一个自动换下一个。⚠️ 这批**全是思考模型**，reasoning token 计入 total_tokens（实测 \"你好\" 一句就花 166 token，其中 118 是思考），所以 200 万/天并不算多",
       "caveats": [
         "接入点 ID 必须从控制台「在线推理 → 接入点」抄；用模型名直调多为 404",
-        "欠费是账号级状态：一旦欠费，所有按量接入点一律 403，和额度够不够无关",
+        "接入点 ID 里的 rn / rm、数字极易看错（本项目就抄错过一次），复制粘贴最稳",
+        "欠费是账号级状态：一旦欠费，所有按量接入点一律 403，和额度够不够无关；且余额为 0 时结算延迟仍可能产生欠费",
         "接入点 ep-xxx 只能走 /api/v3，打 /api/coding/v3 会报 UnsupportedModel"
       ],
       "confidence": "high"
