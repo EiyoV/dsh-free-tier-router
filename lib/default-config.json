@@ -24,12 +24,13 @@
       "baseURL": "https://open.bigmodel.cn/api/paas/v4",
       "priority": 20,
       "capabilities": [
-        "text"
+        "text",
+        "tools"
       ],
-      "defaultModel": "glm-4.7-flash",
+      "defaultModel": "glm-4-flash",
       "models": [
-        "glm-4.7-flash",
-        "glm-4-flash"
+        "glm-4-flash",
+        "glm-4.7-flash"
       ],
       "limits": {
         "note": "官方模型总览页标为免费；RPM/TPM 未核实。模型 id 会变，务必用 npm run probe 核实"
@@ -123,7 +124,8 @@
       "baseURL": "https://qianfan.baidubce.com/v2",
       "priority": 13,
       "capabilities": [
-        "text"
+        "text",
+        "tools"
       ],
       "defaultModel": "ernie-4.5-turbo-128k",
       "models": [
