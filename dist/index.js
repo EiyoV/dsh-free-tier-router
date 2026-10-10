@@ -30,9 +30,12 @@ import { HealthRegistry } from '../lib/health.mjs';
 import { BudgetTracker } from '../lib/budget.mjs';
 import { startProxy } from '../lib/server.mjs';
 import { fetchBalance, clearBalanceCache } from '../lib/balance.mjs';
+import { createTavilyProvider, resolveTavilyKey } from '../lib/tavily-search.mjs';
 
 const name = 'dsh-free-tier-router';
-const inject = ['webServer'];
+// 'web' = dsh-web 的搜索/抓取服务：本插件往里注册一个 Tavily 搜索 provider，
+// 接管 DSH 原生的 web_search 工具（详见 lib/tavily-search.mjs 顶部注释）。
+const inject = ['webServer', 'web'];
 
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -622,6 +625,23 @@ export async function apply(ctx, config = {}) {
       }
     },
   });
+
+  // ── Tavily 搜索 provider：接管 DSH 原生的 web_search ──────────────
+  // dsh-web 的选择语义是「配了 id 用它 / 没配 id 且恰好一个可用也用它 / 没配 id 但多个
+  // 可用就抛 WEB_PROVIDER_AMBIGUOUS」。内置的 dsh-web-search-deepseek 只要有 key 就
+  // available，所以必须把 id 钉死 —— 那行在 cordis.patch.yml 里（web.searchProvider）。
+  // 注册返回 disposer，交给 ctx.effect 在插件卸载时自动注销。
+  const tavilyKey = resolveTavilyKey();
+  ctx.effect(
+    () => ctx.web.registerSearchProvider(createTavilyProvider()),
+    `${name}: tavily search provider`
+  );
+  log(
+    tavilyKey.key
+      ? `Tavily 搜索 provider 已注册（id=tavily，key 来源：${tavilyKey.origin}）`
+      : 'Tavily key 未配置：provider 已注册但 available()=false，搜索会退回内置 provider；' +
+          '填 ~/.dsh/llm-router/.env 的 TAVILY_API_KEY 后生效'
+  );
 
   // ── 额度熔断：能查真实余额的渠道定时补货 ──────────────────────────
   // OpenRouter 这类平台有官方余额接口（balance.mjs）。查到的剩余额度直接灌进预算账本，
