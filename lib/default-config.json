@@ -127,6 +127,27 @@
       }
     },
     {
+      "id": "modelscope",
+      "label": "魔搭 ModelScope API-Inference（阿里·国内直连）",
+      "apiKeyEnv": "MODELSCOPE_API_KEY",
+      "baseURL": "https://api-inference.modelscope.cn/v1",
+      "priority": 16,
+      "capabilities": [
+        "text",
+        "tools"
+      ],
+      "defaultModel": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "models": [
+        "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "Qwen/Qwen3.8-Flash-Next",
+        "Qwen/Qwen3.5-35B-A3B",
+        "MiniMax/MiniMax-M3"
+      ],
+      "limits": {
+        "note": "GET /v1/models 公开可读（无需 key），实测 35 个模型：DeepSeek-V4-Flash-0731 / V4-Pro / V4.1-Flash、Qwen3.5-397B-A17B、Qwen3.8-Flash-Next、MiniMax-M3、stepfun Step-3.5-Flash 等，质量明显强于硅基流动的 Qwen3-8B。⚠️ 模型表**只有 id/object/owned_by/created，没有能力字段也没有价格** —— 所以 tools/image 支持必须用 probe 实测。在核实之前 priority 故意压在 siliconflow(15) 之后：万一同名模型其实不支持 tools，会返回 200+纯文本被路由当成成功，机器人就静默不回复了（glm-4-flash 就是栽在这）。额度规则也未核实，故不设 tokens 熔断，只靠 429 冷却。核实通过后可以把 priority 提到 12。"
+      }
+    },
+    {
       "id": "qianfan-text",
       "label": "百度千帆文本 ernie-4.5-turbo-128k（国内直连·实测 7 token）",
       "apiKeyEnv": "QIANFAN_API_KEY",

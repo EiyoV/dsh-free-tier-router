@@ -48,6 +48,19 @@
       "confidence": "low"
     },
     {
+      "id": "modelscope",
+      "label": "魔搭 ModelScope API-Inference（阿里）",
+      "priorityHint": 25,
+      "registerUrl": "https://www.modelscope.cn/",
+      "materials": "阿里云账号 / 国内手机号注册 → 个人中心「访问令牌」生成 SDK Token",
+      "apiKeyEnv": "MODELSCOPE_API_KEY",
+      "baseURL": "https://api-inference.modelscope.cn/v1",
+      "verified": "2026-10-10 本机实测：GET /v1/models **公开可读、无需 key**，返回 35 个模型（含 DeepSeek-V4-Flash/Pro、Qwen3.5-397B、MiniMax-M3、Step-3.5-Flash 等）。免费额度具体数额未核实 —— 官方按调用次数计，注册后控制台可查",
+      "knownModels": ["deepseek-ai/DeepSeek-V4-Flash-0731", "Qwen/Qwen3.8-Flash-Next", "Qwen/Qwen3.5-35B-A3B", "MiniMax/MiniMax-M3"],
+      "capabilitiesHint": "国内直连。模型质量明显强于硅基流动的 Qwen3-8B；**但哪些模型支持 tools 必须用 probe 实测**（模型表不提供能力字段）",
+      "confidence": "medium"
+    },
+    {
       "id": "volcano",
       "label": "火山方舟 Coding Plan（订阅制）",
       "priorityHint": 100,
