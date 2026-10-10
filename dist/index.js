@@ -525,14 +525,18 @@ export async function apply(ctx, config = {}) {
         }
 
         if (action === 'discover') {
-          const r = await runScript([join(BUILTIN_DIR, 'discover.mjs'), '--openrouter'], 120000);
+          // --openrouter：拉 OpenRouter 的零价模型（唯一带 pricing 的渠道）
+          // --models：对所有已配置渠道拉 /v1/models，报「线上有哪些 / 新增 / 消失」
+          // 以前只跑 --openrouter，导致智谱/火山/ModelScope/硅基这些渠道**永远扫不到**
+          // —— 这正是「点了发现新模型却看不到 ModelScope」的机制层原因。
+          const r = await runScript([join(BUILTIN_DIR, 'discover.mjs'), '--openrouter', '--models'], 180000);
           return sendJson(res, 200, r);
         }
 
         if (action === 'discover-apply') {
           const r = await runScript(
-            [join(BUILTIN_DIR, 'discover.mjs'), '--openrouter', '--update'],
-            120000
+            [join(BUILTIN_DIR, 'discover.mjs'), '--openrouter', '--models', '--update'],
+            180000
           );
           return sendJson(res, 200, r);
         }
