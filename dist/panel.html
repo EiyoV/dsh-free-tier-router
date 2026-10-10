@@ -145,9 +145,18 @@
     el.className = bad ? 'bad' : '';
   }
 
-  function setBusy(busy) {
-    ['btn-clear', 'btn-reset-usage', 'btn-probe', 'btn-probe-vision', 'btn-discover', 'btn-apply', 'btn-reload', 'btn-refresh']
-      .forEach(function (id) { $(id).disabled = busy; });
+  // 探测 / 发现是长任务（后端上限：probe 5 分钟、discover 3 分钟）。长任务期间只锁
+  // 「会再起一个长任务」的按钮，别把「刷新」「重新加载配置」「解除冷却」一起锁死 ——
+  // 上一版全锁，用户看到的就是「点了没反应」，而那几个只读/急救按钮其实随时能用。
+  var LONG_RUN_BUTTONS = ['btn-probe', 'btn-probe-vision', 'btn-discover', 'btn-apply'];
+  var ALL_BUSY_BUTTONS = [
+    'btn-clear', 'btn-reset-usage', 'btn-probe', 'btn-probe-vision',
+    'btn-discover', 'btn-apply', 'btn-reload', 'btn-refresh',
+  ];
+
+  function setBusy(busy, onlyLongRun) {
+    var ids = onlyLongRun ? LONG_RUN_BUTTONS : ALL_BUSY_BUTTONS;
+    ids.forEach(function (id) { var el = $(id); if (el) el.disabled = busy; });
   }
 
   /**
@@ -289,7 +298,11 @@
     var s = j.search;
     html += stat(
       '联网搜索',
-      !s ? '旧版插件' : s.registered ? (s.available ? 'Tavily ✓' : 'Tavily 缺 key') : '未注册',
+      !s
+        ? '旧版插件'
+        : s.registered
+          ? (s.available ? 'Tavily ✓ ' + (s.keyCount || 0) + ' 把' : 'Tavily 缺 key')
+          : '未注册',
       !s ? 'err' : s.registered ? (s.available ? 'ok' : 'warn') : 'err'
     );
 
@@ -314,10 +327,11 @@
       'provider=' + esc(s.provider),
       'ctx.web 注入' + (s.injected ? ' ✓' : ' ✗'),
       '已注册' + (s.registered ? ' ✓' : ' ✗'),
-      'available' + (s.available ? ' ✓' : ' ✗'),
-      'key 来源 ' + esc(s.keyOrigin || '—'),
+      // 只列槽名 / 来源 / 长度，不列 key 内容 —— 这行是 HTTP 接口渲染出来的，同源就能读。
+      '可用 key ' + (s.keyCount || 0) + ' 把' + (s.keyCount > 1 ? '（逐把自动试）' : ''),
     ];
-    if (s.keyHint) bits.push(esc(s.keyHint));
+    if ((s.keySlots || []).length) bits.push(esc(s.keySlots.join(' / ')));
+    if (s.nextSlot) bits.push('下一空槽 ' + esc(s.nextSlot));
     el.innerHTML = '联网搜索 ' + bits.join(' · ') + ' · ' + esc(s.pinnedBy || '')
       + (s.error ? ' · <span class="warn">' + esc(s.error) + '</span>' : '');
   }
@@ -376,7 +390,9 @@
         + (c.caveats || []).map(function (x) { return '<div class="meta warn">⚠️ ' + esc(x) + '</div>'; }).join('');
 
       if (keys.length) {
-        html += '<div class="meta" style="margin-top:10px"><b>API Key（' + filled + '/' + keys.length + ' 把已填）</b></div>';
+        var isSearch = c.category === 'search';
+        html += '<div class="meta" style="margin-top:10px"><b>API Key（' + filled + '/' + keys.length + ' 把已填）'
+          + (isSearch ? ' · 搜索时按槽位顺序逐把自动试' : '') + '</b></div>';
         for (var k = 0; k < keys.length; k += 1) {
           var key = keys[k];
           var pid0 = (key.providerIds || [])[0] || '';
@@ -388,20 +404,31 @@
             + '<input type="password" id="acct-' + esc(key.name) + '" placeholder="输入新值可替换这一把" autocomplete="off" spellcheck="false" />'
             + '<button data-savekey="' + esc(key.name) + '" data-input="acct-' + esc(key.name) + '">替换</button>'
             + (keys.length > 1
-                ? '<button data-delkey="' + esc(key.name) + '" data-provider="' + esc(pid0) + '">删除</button>'
+                ? (isSearch
+                    // 搜索槽位没有 config provider 可摘，「清空」= 把这一行的值写空：
+                    // 空槽会被 resolveTavilyKeys 跳过，等于这把下线，变量名留着随时能再填。
+                    ? '<button data-clearkey="' + esc(key.name) + '">清空</button>'
+                    : '<button data-delkey="' + esc(key.name) + '" data-provider="' + esc(pid0) + '">删除</button>')
                 : '')
             + '</div>';
         }
-        // 「增加一把」要把新槽位挂到某个池中 provider（data-addkey）。未入池的渠道
-        // （Tavily 这类搜索渠道）没有 provider 可挂，发出去就是空 addTo —— 与其显示
-        // 一个点必失败的按钮，不如不显示，并说明它一把 key、换值直接替换上面那行。
-        var canAdd = keys[0].addTo || (c.providerIds || []).length;
-        html += canAdd
-          ? ('<div class="keyrow" style="margin-top:10px">'
-              + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴另一个账号的 key" autocomplete="off" spellcheck="false" />'
-              + '<button data-addkey="' + esc(keys[0].addTo || (c.providerIds || [])[0] || '') + '" data-input="new-' + esc(c.id) + '">➕ 增加一把</button>'
-              + '</div>')
-          : '<div class="meta" style="margin-top:10px">这类渠道一把 key —— 换 key 直接替换上面那一行。</div>';
+        // 「增加一把」有两个落点，别混：
+        //  · LLM 渠道：新槽名由后端按池中 provider 生成，走 /account（data-addkey）
+        //  · 搜索类渠道：没有 provider 可挂，直接写 .env 的下一个空槽（data-savekey=nextSlot）
+        // 两个都没有就不显示按钮 —— 点一个 target 为空的按钮必然失败（上一版踩过）。
+        var addSlot = c.nextSlot || keys[0].addTo || (c.providerIds || [])[0] || '';
+        if (addSlot) {
+          html += '<div class="keyrow" style="margin-top:10px">'
+            + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴另一个账号的 key" autocomplete="off" spellcheck="false" />'
+            + (c.nextSlot
+                ? '<button data-savekey="' + esc(c.nextSlot) + '" data-input="new-' + esc(c.id) + '">➕ 增加一把 → ' + esc(c.nextSlot) + '</button>'
+                : '<button data-addkey="' + esc(addSlot) + '" data-input="new-' + esc(c.id) + '">➕ 增加一把</button>')
+            + '</div>';
+        } else {
+          html += '<div class="meta" style="margin-top:10px">'
+            + (isSearch ? '槽位已满（最多 9 把），先清空一把再加。' : '这类渠道一把 key —— 换 key 直接替换上面那一行。')
+            + '</div>';
+        }
       } else {
         html += '<div class="keyrow" style="margin-top:10px">'
           + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴 key（先去上面的地址注册）" autocomplete="off" spellcheck="false" />'
@@ -454,10 +481,19 @@
   }
 
   async function runAction(what, extra) {
-    setBusy(true);
-    setMsg('正在执行 ' + what + ' …（探测/发现会真实调用上游，可能几十秒）');
+    var isLongRun = what === 'probe' || what === 'discover' || what === 'discover-apply';
+    var maxMin = what === 'probe' ? 5 : 3;
+    setBusy(true, isLongRun);
+    setMsg('正在执行 ' + what + ' …' + (isLongRun
+      ? '（会真实调用上游，最长约 ' + maxMin + ' 分钟；期间「刷新」「重新加载配置」仍可点，不用干等）'
+      : ''));
     try {
-      var r = await fetch('/api/llm-router/action?do=' + encodeURIComponent(what) + (extra || ''), { cache: 'no-store' });
+      var r = await fetch('/api/llm-router/action?do=' + encodeURIComponent(what) + (extra || ''), {
+        cache: 'no-store',
+        // 后端 execFile 带 timeout，最迟会返回；前端也必须设上限 —— 否则连接一旦挂住，
+        // 这个 await 永不 resolve、finally 不执行、按钮全灰，表现同样是「点了没反应」。
+        signal: AbortSignal.timeout(isLongRun ? (maxMin + 1) * 60000 : 60000),
+      });
       var j = await r.json();
       var text = j.output || j.result || JSON.stringify(j, null, 2);
       var box = $('out');
@@ -505,7 +541,12 @@
         var j1 = await r1.json();
         if (j1.ok) {
           input.value = '';
-          setMsg('已保存 ' + keyName + '。点「重新加载配置」让它生效。');
+          setMsg(
+            // 搜索槽位是 provider 每次搜索现读的，填完就用得上；LLM 渠道的 key 要重载配置才生效。
+            /^TAVILY_API_KEY(_\d+)?$/.test(keyName)
+              ? '已保存 ' + keyName + '（下一次搜索即生效，不用重载配置）'
+              : '已保存 ' + keyName + '。点「重新加载配置」让它生效。'
+          );
           await loadCatalog();
         } else {
           setMsg('保存失败：' + (j1.error || '未知错误'), true);
@@ -541,6 +582,34 @@
         setMsg('删除失败：' + e.message, true);
       } finally {
         delBtn.disabled = false;
+      }
+      return;
+    }
+
+    // ── 清空搜索类渠道的一个 key 槽（值写空、变量名保留）──────────────
+    // LLM 渠道的「删除」要从 config provider 里摘槽位（走 /account）；搜索槽没有 provider
+    // 可摘 —— 对它来说"让这把 key 下线"就是把 .env 这一行的值清空，空值会被轮换逻辑跳过。
+    var clearBtn = ev.target.closest('button[data-clearkey]');
+    if (clearBtn) {
+      var clearName = clearBtn.getAttribute('data-clearkey');
+      if (!window.confirm('清空 ' + clearName + ' ？\n\n只清掉这一行的值，变量名保留，下次直接填回来即可。\n搜索会跳过空槽、用剩下的 key —— 不需要重启。')) return;
+      clearBtn.disabled = true;
+      try {
+        var rc = await fetch('/api/llm-router/save-key', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: clearName, value: '' })
+        });
+        var jc = await rc.json();
+        setMsg(
+          jc.ok ? '已清空 ' + clearName + '（下一次搜索即生效）' : '清空失败：' + (jc.error || '未知错误'),
+          !jc.ok
+        );
+        await loadCatalog();
+      } catch (e) {
+        setMsg('清空失败：' + e.message, true);
+      } finally {
+        clearBtn.disabled = false;
       }
       return;
     }

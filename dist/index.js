@@ -30,7 +30,12 @@ import { HealthRegistry } from '../lib/health.mjs';
 import { BudgetTracker } from '../lib/budget.mjs';
 import { startProxy } from '../lib/server.mjs';
 import { fetchBalance, clearBalanceCache } from '../lib/balance.mjs';
-import { createTavilyProvider, resolveTavilyKey } from '../lib/tavily-search.mjs';
+import {
+  createTavilyProvider,
+  resolveTavilyKeys,
+  tavilySlotNames,
+  nextTavilySlot,
+} from '../lib/tavily-search.mjs';
 
 const name = 'dsh-free-tier-router';
 // 'web' = dsh-web 的搜索/抓取服务：本插件往里注册一个 Tavily 搜索 provider，
@@ -248,18 +253,20 @@ export async function apply(ctx, config = {}) {
    * 搜索 provider 的自检视图。available / keyOrigin **每次请求现算**——key 可能中途才填上，
    * 而且改 .env 不需要重启就生效；registered / injected 则来自装配时的 state.search。
    *
-   * 只输出 key 的前 8 位与总长度，绝不把 key 本身端出去：这是个 HTTP 接口，
+   * 只输出槽名、来源与长度，绝不把 key 本身端出去：这是个 HTTP 接口，
    * 面板同源可读，泄露出去就是全网可读（check-secrets.mjs 也在盯这个）。
    */
   function searchStatus() {
-    const k = resolveTavilyKey();
+    const keys = resolveTavilyKeys();
     return {
       provider: 'tavily',
       injected: state.search.injected,
       registered: state.search.registered,
-      available: k.key !== '',
-      keyOrigin: k.origin || '（未配置）',
-      keyHint: k.key ? `${k.key.slice(0, 8)}…（共 ${k.key.length} 字符）` : '',
+      available: keys.length > 0,
+      keyCount: keys.length,
+      // 每把只显示「槽名（来源，长度）」，不显示 key 内容（含前缀）—— 见上面那段说明。
+      keySlots: keys.map((k) => `${k.name}（${k.origin}，${k.value.length} 字符）`),
+      nextSlot: nextTavilySlot(keys.map((k) => k.name)),
       pinnedBy: 'web.searchProvider=tavily（本插件 cordis.patch.yml）',
       error: state.search.error,
     };
@@ -354,17 +361,27 @@ export async function apply(ctx, config = {}) {
             }
           }
 
-          // 未入池的渠道（比如搜索类 Tavily）没有 provider 可关联，但它自己的 apiKeyEnv
-          // 只要已经在 .env 填过，就该显示成一个「已填 ✅」的槽位 —— 否则用户填完刷新，
-          // 卡片仍然是空的输入框，根本分不清到底填没填上。
-          if (keyMap.size === 0 && ch.apiKeyEnv && env[ch.apiKeyEnv]) {
-            keyMap.set(ch.apiKeyEnv, {
-              name: ch.apiKeyEnv,
-              filled: true,
-              length: String(env[ch.apiKeyEnv]).length,
-              providerIds: [],
-              addTo: null, // 没有池中 provider 可挂：面板据此隐藏「增加一把」
-            });
+          // 未入池的渠道没有 provider 可关联，但 .env 里填过的 key 也该显示成「已填 ✅」槽位，
+          // 否则填完刷新仍是空输入框，根本分不清填没填上。
+          // 搜索类（category=search）还要把槽位**全部枚举**出来：TAVILY_API_KEY、_2、_3…
+          // 它的多把 key 就靠这些变量名承载（provider 侧逐把轮换，见 lib/tavily-search.mjs），
+          // 面板据此做「填 / 换 / 增加 / 清空」，和 LLM 渠道那套观感保持一致。
+          if (keyMap.size === 0 && ch.apiKeyEnv) {
+            const slots =
+              ch.category === 'search'
+                ? tavilySlotNames().filter((n) => env[n])
+                : env[ch.apiKeyEnv]
+                  ? [ch.apiKeyEnv]
+                  : [];
+            for (const n of slots) {
+              keyMap.set(n, {
+                name: n,
+                filled: true,
+                length: String(env[n]).length,
+                providerIds: [],
+                addTo: null, // 没有池中 provider 可挂：面板走 save-key 直接写这一行
+              });
+            }
           }
 
           return {
@@ -383,6 +400,13 @@ export async function apply(ctx, config = {}) {
              * 点保存被 save-key 接口以"变量名不合法"驳回 —— 表现就是"key 填了存不上"。
              */
             apiKeyEnv: ch.apiKeyEnv ?? null,
+            /** 'search' = 搜索类渠道：不入池，多把 key 靠 .env 的槽位变量承载 */
+            category: ch.category ?? null,
+            /**
+             * 搜索类的下一个空槽名。面板「增加一把」把它当 save-key 的变量名直接写 .env
+             * （它不像 LLM 渠道那样有 config provider 可挂，所以不走 account 接口）。
+             */
+            nextSlot: ch.category === 'search' ? nextTavilySlot([...keyMap.keys()]) : null,
             /** config.json 里有没有对应 provider */
             inPool: matched.length > 0,
             enabled: matched.some((p) => p.enabled !== false),
