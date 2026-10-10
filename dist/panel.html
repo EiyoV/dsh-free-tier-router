@@ -95,6 +95,7 @@
   <div class="sub" id="sub">正在读取…</div>
 
   <div class="summary" id="summary"></div>
+  <div class="meta" id="search-note">联网搜索：读取中…</div>
 
   <div class="bar">
     <button id="btn-probe" class="primary">探测并优化优先级</button>
@@ -283,7 +284,42 @@
     html += stat('累计调用', calls.toLocaleString());
     if (next) html += stat('下一个恢复', fmtTime(next), 'warn');
 
+    // 联网搜索徽章。没有 j.search 就是「DSH 加载的还是没有自检字段的旧版插件」，
+    // 直接说出来，别让人误判成「装了但坏了」。
+    var s = j.search;
+    html += stat(
+      '联网搜索',
+      !s ? '旧版插件' : s.registered ? (s.available ? 'Tavily ✓' : 'Tavily 缺 key') : '未注册',
+      !s ? 'err' : s.registered ? (s.available ? 'ok' : 'warn') : 'err'
+    );
+
     $('summary').innerHTML = html;
+  }
+
+  /**
+   * 联网搜索自检明细。**刻意独立于 renderSummary**：代理挂了、渠道为空的时候，
+   * 恰恰最需要知道搜索这边是什么状态，不能被渠道渲染的分支带跑。
+   */
+  function renderSearchNote(j) {
+    var el = $('search-note');
+    if (!el) return;
+    var s = j && j.search;
+    if (!s) {
+      el.innerHTML = j
+        ? '联网搜索：<span class="warn">status 里没有 search 字段 —— DSH 加载的还是旧版插件，重装插件并重启 DSH</span>'
+        : '联网搜索：<span class="warn">读不到 /api/llm-router/status（插件未加载，或 DSH 还没重启）</span>';
+      return;
+    }
+    var bits = [
+      'provider=' + esc(s.provider),
+      'ctx.web 注入' + (s.injected ? ' ✓' : ' ✗'),
+      '已注册' + (s.registered ? ' ✓' : ' ✗'),
+      'available' + (s.available ? ' ✓' : ' ✗'),
+      'key 来源 ' + esc(s.keyOrigin || '—'),
+    ];
+    if (s.keyHint) bits.push(esc(s.keyHint));
+    el.innerHTML = '联网搜索 ' + bits.join(' · ') + ' · ' + esc(s.pinnedBy || '')
+      + (s.error ? ' · <span class="warn">' + esc(s.error) + '</span>' : '');
   }
 
   /**
@@ -383,6 +419,9 @@
     try {
       var r = await fetch('/api/llm-router/status', { cache: 'no-store' });
       var j = await r.json();
+      // 搜索自检**先渲染**：渠道为空 / 代理挂了的时候（下面可能 throw）恰恰最需要看见它，
+      // 不能因为渠道渲染中断就一起消失。
+      renderSearchNote(j);
       if (j.error && !(j.providers || []).length) throw new Error(j.error);
       renderStatus(j);
       renderSummary(j);
@@ -391,6 +430,7 @@
         + (j.now ? ' · 代理时间 ' + j.now : '');
     } catch (e) {
       renderStatus({});
+      renderSearchNote(null);
       $('sub').textContent = '离线';
       setMsg('读不到 llm-router：' + e.message + ' —— 确认它已启动（项目目录下 start.cmd）', true);
     }

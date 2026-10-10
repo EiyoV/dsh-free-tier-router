@@ -140,6 +140,17 @@ export async function apply(ctx, config = {}) {
     /** 'own' = 本插件启动的；'external' = 复用已存在的；'down' = 没起来 */
     mode: 'down',
     error: null,
+    /**
+     * Tavily 搜索 provider 的自检状态。**唯一权威出口是 /api/llm-router/status**
+     * （面板顶部直接显示）。DSH 桌面版没有可见控制台，靠 console.log 判断
+     * "到底装上没"是徒劳的——实测踩过，别再往日志上找。
+     */
+    search: {
+      provider: 'tavily',
+      injected: false,   // ctx.web 是否真的注入进来了（inject: ['web'] 有没有满足）
+      registered: false, // registerSearchProvider 有没有成功跑完
+      error: null,
+    },
   };
 
   // 每次从磁盘读，不缓存：panel.html 才十几 KB，换来"改完面板刷新页面即生效"，
@@ -233,6 +244,27 @@ export async function apply(ctx, config = {}) {
 
   await bootProxy();
 
+  /**
+   * 搜索 provider 的自检视图。available / keyOrigin **每次请求现算**——key 可能中途才填上，
+   * 而且改 .env 不需要重启就生效；registered / injected 则来自装配时的 state.search。
+   *
+   * 只输出 key 的前 8 位与总长度，绝不把 key 本身端出去：这是个 HTTP 接口，
+   * 面板同源可读，泄露出去就是全网可读（check-secrets.mjs 也在盯这个）。
+   */
+  function searchStatus() {
+    const k = resolveTavilyKey();
+    return {
+      provider: 'tavily',
+      injected: state.search.injected,
+      registered: state.search.registered,
+      available: k.key !== '',
+      keyOrigin: k.origin || '（未配置）',
+      keyHint: k.key ? `${k.key.slice(0, 8)}…（共 ${k.key.length} 字符）` : '',
+      pinnedBy: 'web.searchProvider=tavily（本插件 cordis.patch.yml）',
+      error: state.search.error,
+    };
+  }
+
   // ── 路由 1：池状态 ────────────────────────────────────────────────
   ctx.webServer.register({
     kind: 'exact',
@@ -246,6 +278,7 @@ export async function apply(ctx, config = {}) {
           dataDir: DATA_DIR,
           envPath: ENV_PATH,
           providers: [],
+          search: searchStatus(),
         });
       }
       try {
@@ -253,7 +286,13 @@ export async function apply(ctx, config = {}) {
           signal: AbortSignal.timeout(6000),
         });
         const j = await r.json();
-        sendJson(res, 200, { ...j, mode: state.mode, dataDir: DATA_DIR, envPath: ENV_PATH });
+        sendJson(res, 200, {
+          ...j,
+          mode: state.mode,
+          dataDir: DATA_DIR,
+          envPath: ENV_PATH,
+          search: searchStatus(),
+        });
       } catch (err) {
         sendJson(res, 200, {
           ok: false,
@@ -262,6 +301,7 @@ export async function apply(ctx, config = {}) {
           dataDir: DATA_DIR,
           envPath: ENV_PATH,
           providers: [],
+          search: searchStatus(),
         });
       }
     },
@@ -630,18 +670,30 @@ export async function apply(ctx, config = {}) {
   // dsh-web 的选择语义是「配了 id 用它 / 没配 id 且恰好一个可用也用它 / 没配 id 但多个
   // 可用就抛 WEB_PROVIDER_AMBIGUOUS」。内置的 dsh-web-search-deepseek 只要有 key 就
   // available，所以必须把 id 钉死 —— 那行在 cordis.patch.yml 里（web.searchProvider）。
-  // 注册返回 disposer，交给 ctx.effect 在插件卸载时自动注销。
-  const tavilyKey = resolveTavilyKey();
-  ctx.effect(
-    () => ctx.web.registerSearchProvider(createTavilyProvider()),
-    `${name}: tavily search provider`
-  );
-  log(
-    tavilyKey.key
-      ? `Tavily 搜索 provider 已注册（id=tavily，key 来源：${tavilyKey.origin}）`
-      : 'Tavily key 未配置：provider 已注册但 available()=false，搜索会退回内置 provider；' +
-          '填 ~/.dsh/llm-router/.env 的 TAVILY_API_KEY 后生效'
-  );
+  //
+  // 两点刻意的设计：
+  //  1. registered 在注册**当场同步置位**，不靠 ctx.effect 的 setup 时机（它的执行时机
+  //     没保证，靠它就会出现「其实注册成功、面板却说未注册」的假故障）。
+  //  2. 结果一律写进 state.search，由 /api/llm-router/status 摆到面板上。
+  //     桌面版没有可见控制台，往日志里找 provider 痕迹是白费（实测踩过）。
+  state.search.injected = typeof ctx.web?.registerSearchProvider === 'function';
+  if (state.search.injected) {
+    try {
+      const disposeTavily = ctx.web.registerSearchProvider(createTavilyProvider());
+      state.search.registered = true;
+      ctx.effect(
+        () => () => {
+          state.search.registered = false;
+          if (typeof disposeTavily === 'function') disposeTavily();
+        },
+        `${name}: tavily search provider`
+      );
+    } catch (err) {
+      state.search.error = `注册抛错：${err?.message ?? err}`;
+    }
+  } else {
+    state.search.error = 'ctx.web 未注入（inject 里的 "web" 没被满足）';
+  }
 
   // ── 额度熔断：能查真实余额的渠道定时补货 ──────────────────────────
   // OpenRouter 这类平台有官方余额接口（balance.mjs）。查到的剩余额度直接灌进预算账本，
