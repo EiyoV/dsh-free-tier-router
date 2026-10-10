@@ -392,10 +392,16 @@
                 : '')
             + '</div>';
         }
-        html += '<div class="keyrow" style="margin-top:10px">'
-          + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴另一个账号的 key" autocomplete="off" spellcheck="false" />'
-          + '<button data-addkey="' + esc(keys[0].addTo || (c.providerIds || [])[0] || '') + '" data-input="new-' + esc(c.id) + '">➕ 增加一把</button>'
-          + '</div>';
+        // 「增加一把」要把新槽位挂到某个池中 provider（data-addkey）。未入池的渠道
+        // （Tavily 这类搜索渠道）没有 provider 可挂，发出去就是空 addTo —— 与其显示
+        // 一个点必失败的按钮，不如不显示，并说明它一把 key、换值直接替换上面那行。
+        var canAdd = keys[0].addTo || (c.providerIds || []).length;
+        html += canAdd
+          ? ('<div class="keyrow" style="margin-top:10px">'
+              + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴另一个账号的 key" autocomplete="off" spellcheck="false" />'
+              + '<button data-addkey="' + esc(keys[0].addTo || (c.providerIds || [])[0] || '') + '" data-input="new-' + esc(c.id) + '">➕ 增加一把</button>'
+              + '</div>')
+          : '<div class="meta" style="margin-top:10px">这类渠道一把 key —— 换 key 直接替换上面那一行。</div>';
       } else {
         html += '<div class="keyrow" style="margin-top:10px">'
           + '<input type="password" id="new-' + esc(c.id) + '" placeholder="粘贴 key（先去上面的地址注册）" autocomplete="off" spellcheck="false" />'

@@ -197,6 +197,24 @@
       "baseURL": "https://api.groq.com/openai/v1",
       "verified": "未能核实 —— 抓取返回 403",
       "confidence": "unknown"
+    },
+    {
+      "id": "tavily",
+      "label": "Tavily 联网搜索",
+      "category": "search",
+      "priorityHint": 900,
+      "registerUrl": "https://app.tavily.com/",
+      "materials": "邮箱或 Google/GitHub 注册即可，**免费档不需要信用卡**。⚠️ 定价页上付费档的按钮文字和免费档一模一样（都叫 Get Started），点它会跳去绑卡；直接开 app.tavily.com/sign-up，注册后在 Dashboard 的 API Keys 页复制 tvly- 开头的 key",
+      "apiKeyEnv": "TAVILY_API_KEY",
+      "verified": "2026-10-10 核实：官方定价页 Researcher 档写明「1,000 API credits / month」+「No credit card required」；api-credits 文档写明 basic 1 credit/次、advanced 2 credits/次、额度每月 1 号重置。本插件已把它注册成 ctx.web 的搜索 provider（id=tavily），实测原生 web_search 走它返回正常",
+      "capabilitiesHint": "给 DSH 原生 web_search 提供搜索结果，**不参与模型路由** —— 所以按设计不写 baseURL 和 knownModels：catalog 靠 baseURL 关联池中渠道，缺它就永远 inPool=false，probe / discover-apply 也都按 baseURL 过滤，天然碰不到它",
+      "caveats": [
+        "报错是硬停止不是扣费续跑：432=套餐额度用尽、433=按量上限、429=频率超限、401=key 无效",
+        "advanced 搜索吃 2 credits/次，插件默认用 basic（1 credit/次）",
+        "留空也能装：available() 返回 false 就不参与 provider 竞争，搜索自动退回内置的，不会因此报错",
+        "在这里填 key = 写进 .env 的 TAVILY_API_KEY，优先级高于 ~/.dsh/tavily-key.txt；改完点「刷新」即生效，不需要重启 DSH"
+      ],
+      "confidence": "high"
     }
   ]
 }

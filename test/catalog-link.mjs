@@ -18,6 +18,7 @@ const envNamesOf = (p) =>
 let inPool = 0;
 let notInPool = 0;
 let noBaseUrl = 0;
+let searchOnly = 0;
 
 console.log('平台 → 池中渠道（关联依据：baseURL 相同）\n');
 
@@ -27,6 +28,13 @@ for (const ch of catalog.channels ?? []) {
     continue;
   }
   if (!ch.baseURL) {
+    // 搜索类渠道（Tavily）按设计**就不该有 baseURL**：它不进模型路由，关联上反而会被
+    // probe / discover-apply 当成 chat 渠道。所以单独归类，别报成「忘了写 baseURL 的缺陷」。
+    if (ch.category === 'search') {
+      console.log(`🔍 ${(ch.label ?? '').padEnd(30)} 搜索类渠道 · 不参与模型路由（按设计无 baseURL）`);
+      searchOnly += 1;
+      continue;
+    }
     console.log(`⚠️  ${(ch.label ?? '').padEnd(30)} 目录里没写 baseURL，无法关联`);
     noBaseUrl += 1;
     continue;
@@ -48,9 +56,9 @@ for (const ch of catalog.channels ?? []) {
   inPool += 1;
 }
 
-console.log(`\n已入池 ${inPool} 个 · 未入池 ${notInPool} 个 · 缺 baseURL ${noBaseUrl} 个`);
+console.log(`\n已入池 ${inPool} 个 · 未入池 ${notInPool} 个 · 搜索类 ${searchOnly} 个 · 缺 baseURL ${noBaseUrl} 个`);
 
 if (noBaseUrl > 0) {
-  console.log('\n提示：缺 baseURL 的渠道在面板上无法关联到池中渠道，需要给 catalog.json 补上 baseURL。');
+  console.log('\n提示：缺 baseURL 的渠道在面板上无法关联到池中渠道，需要给 catalog.json 补上 baseURL（category=search 的搜索类按设计不适用，已被单独归类）。');
 }
 process.exitCode = inPool > 0 ? 0 : 1;

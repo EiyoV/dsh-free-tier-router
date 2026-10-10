@@ -354,6 +354,19 @@ export async function apply(ctx, config = {}) {
             }
           }
 
+          // 未入池的渠道（比如搜索类 Tavily）没有 provider 可关联，但它自己的 apiKeyEnv
+          // 只要已经在 .env 填过，就该显示成一个「已填 ✅」的槽位 —— 否则用户填完刷新，
+          // 卡片仍然是空的输入框，根本分不清到底填没填上。
+          if (keyMap.size === 0 && ch.apiKeyEnv && env[ch.apiKeyEnv]) {
+            keyMap.set(ch.apiKeyEnv, {
+              name: ch.apiKeyEnv,
+              filled: true,
+              length: String(env[ch.apiKeyEnv]).length,
+              providerIds: [],
+              addTo: null, // 没有池中 provider 可挂：面板据此隐藏「增加一把」
+            });
+          }
+
           return {
             id: ch.id,
             label: ch.label,
